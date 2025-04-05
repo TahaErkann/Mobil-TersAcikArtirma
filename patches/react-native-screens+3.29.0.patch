@@ -1,0 +1,63 @@
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
+index 4c12d8c..5e101f9 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStackHeaderConfig.kt
+@@ -22,6 +22,23 @@ import com.swmansion.rnscreens.events.HeaderBackButtonClickedEvent
+ import java.util.*
+ import kotlin.collections.ArrayList
+ 
++// New architecture uyumluluğu için ActivityIndicator boyut yardımcısı
++object ActivityIndicatorSizeHelper {
++    const val LARGE_SIZE = 36f
++    const val SMALL_SIZE = 24f
++    
++    fun getSizeFromValue(value: Any?): Float {
++        return when (value) {
++            is Number -> value.toFloat()
++            is String -> {
++                when (value.lowercase()) {
++                    "large" -> LARGE_SIZE
++                    "small" -> SMALL_SIZE
++                    else -> LARGE_SIZE
++                }
++            }
++            else -> LARGE_SIZE
++        }
++    }
++}
++
+ class ScreenStackHeaderConfig(context: Context?) : ViewGroup(context) {
++
++    // Override getDefaultEventTypes method to handle new architecture
++    override fun getDefaultEventTypes(): List<Any> {
++        return ArrayList<Any>()
++    }
++
++    // Support for converting string size values to numeric
++    private fun getSizeValue(value: Any?): Float {
++        return ActivityIndicatorSizeHelper.getSizeFromValue(value)
++    }
+ }
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/Screen.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/Screen.kt
+index c098d8f..1a60f99 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/Screen.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/Screen.kt
+@@ -141,7 +141,14 @@ class Screen constructor(context: Context?) : ViewGroup(context) {
+         // Fix for new architecture
+         // Override getDefaultEventTypes method
+         try {
+-            getDefaultEventTypes()
++            val method = this::class.java.getDeclaredMethod("getDefaultEventTypes")
++            // Method exists, do nothing
+         } catch (e: Exception) {
+-            // Ignored, new architecture method not required
++            // Add method implementation for new architecture
++            // This is a no-op - we just need to handle the method call
+         }
+     }
++
++    // Implement getDefaultEventTypes for new architecture
++    fun getDefaultEventTypes(): List<Any> {
++        return ArrayList<Any>()
++    }
+ } 

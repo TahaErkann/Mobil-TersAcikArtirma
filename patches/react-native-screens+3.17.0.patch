@@ -1,0 +1,23 @@
+package com.swmansion.rnscreens
+
+import android.util.Log
+
+// ActivityIndicator için eklediğimiz kod
+object ActivityIndicatorSizeHelper {
+    const val LARGE_SIZE = 36
+    const val SMALL_SIZE = 24
+    
+    fun getSizeFromValue(value: Any?): Float {
+        return when (value) {
+            is Number -> value.toFloat()
+            is String -> {
+                if (value.equals("large", ignoreCase = true)) {
+                    LARGE_SIZE.toFloat()
+                } else if (value.equals("small", ignoreCase = true)) {
+                    SMALL_SIZE.toFloat()
+                } else { LARGE_SIZE.toFloat() }
+            }
+            else -> LARGE_SIZE.toFloat()
+        }
+    }
+} 
