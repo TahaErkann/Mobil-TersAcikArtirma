@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Image, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
-import { Text, Button, Title, Card } from 'react-native-paper';
+import { Text, Button, Title, Card, ActivityIndicator } from 'react-native-paper';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const { width } = Dimensions.get('window');
@@ -248,7 +248,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   fullWidthButton: {
-    backgroundColor: '#4F46E5',
     paddingVertical: 8,
   },
 });

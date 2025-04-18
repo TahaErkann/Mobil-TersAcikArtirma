@@ -5,29 +5,69 @@ import api from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../types';
 
+// API URLs - api.ts dosyasındakiyle aynı olmalı
+const API_URLS = {
+  ANDROID_EMULATOR: 'http://10.0.2.2:5001',
+  IOS_SIMULATOR: 'http://localhost:5001',
+  DEVELOPMENT: 'http://192.168.69.112:5001',
+  TEST: 'http://192.168.69.112:5001',
+};
+
+// Aktif API URL - kendi sunucunuza göre ayarlayın
+const ACTIVE_API_URL = API_URLS.TEST;
+
 // Socket Context tipleri
 interface SocketContextType {
-  on: (event: string, callback: (data: any) => void) => void;
-  off: (event: string, callback: (data: any) => void) => void;
-  emit: (event: string, data: any) => void;
-  connected: boolean;
+  socket: Socket | null;
+  isConnected: boolean;
 }
 
 // Context'i oluştur
 export const SocketContext = createContext<SocketContextType>({
-  on: () => {},
-  off: () => {},
-  emit: () => {},
-  connected: false
+  socket: null,
+  isConnected: false,
 });
 
 // Hook
-export const useSocket = (): SocketContextType => {
+export const useSocket = () => {
   const context = useContext(SocketContext);
   if (!context) {
     throw new Error('useSocket must be used within a SocketProvider');
   }
-  return context;
+  
+  // Geriye dönük uyumluluk için on, off, emit metodlarını ekle
+  const on = (event: string, callback: (data: any) => void) => {
+    if (context.socket) {
+      context.socket.on(event, callback);
+    } else {
+      console.warn(`Socket bağlantısı olmadan "${event}" olayı dinlenemedi.`);
+    }
+  };
+  
+  const off = (event: string, callback: (data: any) => void) => {
+    if (context.socket) {
+      context.socket.off(event, callback);
+    } else {
+      console.warn(`Socket bağlantısı olmadan "${event}" olayı durdurulamadı.`);
+    }
+  };
+  
+  const emit = (event: string, data: any) => {
+    if (context.socket) {
+      context.socket.emit(event, data);
+    } else {
+      console.warn(`Socket bağlantısı olmadan "${event}" olayı gönderilemedi.`);
+    }
+  };
+  
+  // Hem eski hem yeni arayüzü dön
+  return {
+    ...context,
+    on,
+    off,
+    emit,
+    connected: context.isConnected
+  };
 };
 
 // Provider
@@ -36,100 +76,84 @@ interface SocketProviderProps {
 }
 
 export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
-  const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [connected, setConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const { isAuthenticated, user } = useAuth();
 
   useEffect(() => {
-    if (!user) {
-      if (socket) {
-        console.log('Socket bağlantısı kapatılıyor (kullanıcı oturumu kapalı)');
-        socket.disconnect();
-        setSocket(null);
-        setConnected(false);
-      }
-      return;
-    }
+    let socketInstance: Socket | null = null;
 
-    const setupSocket = async () => {
-      try {
-        // Token'ı AsyncStorage'dan al
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
-        if (!token) {
-          console.error('Socket bağlantısı için token bulunamadı');
-          return;
+    const connectSocket = () => {
+      if (isAuthenticated && user) {
+        try {
+          // Socket.io bağlantısını ana URL'e yap, namespace kullanma
+          socketInstance = io(ACTIVE_API_URL, {
+            reconnectionAttempts: 5,
+            reconnectionDelay: 5000,
+            // Namespace yerine auth parametresi ile yetkilendirme
+            auth: {
+              userId: user._id
+            },
+            // Otomatik yeniden bağlanma
+            reconnection: true,
+            // Bağlantı zaman aşımı (30 saniye)
+            timeout: 30000,
+          });
+
+          socketInstance.on('connect', () => {
+            console.log('Socket.io bağlantısı kuruldu');
+            setIsConnected(true);
+          });
+
+          socketInstance.on('disconnect', (reason) => {
+            console.log(`Socket.io bağlantısı kapandı: ${reason}`);
+            setIsConnected(false);
+          });
+
+          socketInstance.on('connect_error', (error) => {
+            console.error('Socket.io bağlantı hatası:', error.message);
+            // Bağlantı hataları yok sayılabilir, uygulama çalışmaya devam edebilir
+            setIsConnected(false);
+          });
+
+          socketInstance.on('error', (error) => {
+            console.error('Socket.io hatası:', error);
+            setIsConnected(false);
+          });
+
+          setSocket(socketInstance);
+        } catch (error) {
+          console.error('Socket.io başlatma hatası:', error);
+          setIsConnected(false);
         }
-
-        // Socket.io bağlantısı kur
-        const socketInstance = io(api.defaults.baseURL || 'http://192.168.1.109:5001', {
-          transports: ['websocket'],
-          auth: {
-            token: token
-          }
-        });
-
-        // Bağlantı olaylarını dinle
-        socketInstance.on('connect', () => {
-          console.log('Socket.io bağlantısı kuruldu');
-          setConnected(true);
-        });
-
-        socketInstance.on('connect_error', (err) => {
-          console.error('Socket.io bağlantı hatası:', err.message);
-          setConnected(false);
-        });
-
-        socketInstance.on('disconnect', (reason) => {
-          console.log('Socket.io bağlantısı kesildi:', reason);
-          setConnected(false);
-        });
-
-        setSocket(socketInstance);
-
-        return socketInstance;
-      } catch (error) {
-        console.error('Socket başlatma hatası:', error);
-        setConnected(false);
-        return null;
+      } else {
+        // Kullanıcı giriş yapmamışsa, socket bağlantısını kapat
+        if (socketInstance) {
+          console.log('Socket bağlantısı kapatılıyor (kullanıcı oturumu kapalı)');
+          socketInstance.disconnect();
+          socketInstance = null;
+          setSocket(null);
+          setIsConnected(false);
+        }
       }
     };
 
-    const socketInstance = setupSocket();
+    connectSocket();
 
     // Temizleme işlevi
     return () => {
-      socketInstance.then(socket => {
-        if (socket) {
-          console.log('SocketProvider temizleniyor');
-          socket.disconnect();
-        }
-      });
+      if (socketInstance) {
+        console.log('SocketProvider temizleniyor');
+        socketInstance.disconnect();
+        socketInstance = null;
+        setSocket(null);
+        setIsConnected(false);
+      }
     };
-  }, [user]);
-
-  // Socket olaylarını dinleme
-  const on = (event: string, callback: (data: any) => void) => {
-    if (!socket) return;
-    socket.on(event, callback);
-  };
-
-  // Dinlemeyi durdurma
-  const off = (event: string, callback: (data: any) => void) => {
-    if (!socket) return;
-    socket.off(event, callback);
-  };
-
-  // Olay tetikleme
-  const emit = (event: string, data: any) => {
-    if (!socket) {
-      console.warn(`Socket bağlantısı olmadan "${event}" olayı tetiklenemedi.`);
-      return;
-    }
-    socket.emit(event, data);
-  };
+  }, [isAuthenticated, user]);
 
   return (
-    <SocketContext.Provider value={{ on, off, emit, connected }}>
+    <SocketContext.Provider value={{ socket, isConnected }}>
       {children}
     </SocketContext.Provider>
   );

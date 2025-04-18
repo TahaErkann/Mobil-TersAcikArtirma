@@ -1,0 +1,53 @@
+import { ActivityIndicator } from 'react-native';
+import { withInternalTheme } from '../core/theming';
+
+/**
+ * Activity indicator is used to present progress of some activity in the app.
+ * It can be used as a drop-in for the ActivityIndicator shipped with React Native.
+ *
+ * ## Usage
+ * ```js
+ * import * as React from 'react';
+ * import { ActivityIndicator, MD2Colors } from 'react-native-paper';
+ *
+ * const MyComponent = () => (
+ *   <ActivityIndicator animating={true} color={MD2Colors.red800} />
+ * );
+ *
+ * export default MyComponent;
+ * ```
+ */
+const ActivityIndicator = (_ref) => {
+  let {
+    animating = true,
+    color: indicatorColor,
+    hidesWhenStopped = true,
+    size: indicatorSize = 'small',
+    style,
+    theme,
+    ...rest
+  } = _ref;
+  
+  // Yeni mimari için 'string' boyutları sayısal değerlere dönüştür
+  let numericSize = indicatorSize;
+  if (indicatorSize === 'small') {
+    numericSize = 24;
+  } else if (indicatorSize === 'large') {
+    numericSize = 52;
+  }
+  
+  const { animation, colors } = theme;
+  const color = indicatorColor || colors?.primary;
+  
+  return <ActivityIndicator 
+    {...rest}
+    color={color}
+    size={numericSize}
+    style={[{ opacity: 1 }, style]}
+    animating={animating}
+    hidesWhenStopped={hidesWhenStopped}
+  />;
+};
+
+export default withInternalTheme(ActivityIndicator);
+//# sourceMappingURL=ActivityIndicator.js.map 

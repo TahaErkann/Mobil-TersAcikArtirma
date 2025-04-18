@@ -1,0 +1,81 @@
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/ScreenStackFragment.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/ScreenStackFragment.kt
+index 0ad00f7..a6e8c0c 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/ScreenStackFragment.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/ScreenStackFragment.kt
+@@ -17,6 +17,27 @@ import javax.microedition.khronos.opengles.GL10
+ import kotlin.math.max
+ import kotlin.math.min
+
++// ActivityIndicator için eklediğimiz kod
++object ActivityIndicatorSizeHelper {
++    // String değeri sayısal değere dönüştür
++    fun getSizeFromValue(value: Any?): Float {
++        if (value == null) {
++            return 36f // default size
++        }
++
++        if (value is Number) {
++            return (value as Number).toFloat()
++        }
++
++        if (value is String) {
++            if (value == "small") return 24f
++            if (value == "large") return 36f
++            return 36f // default
++        }
++        
++        return 36f // default size
++    }
++}
++
+ class ScreenStackFragment : ScreenFragment() {
+   var screenNavigationView: ScreenNavigationView? = null
+     private set
+
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/CustomScreenStackHeaderConfig.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/CustomScreenStackHeaderConfig.kt
+index 0ad00f7..a6e8c0c 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/CustomScreenStackHeaderConfig.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/CustomScreenStackHeaderConfig.kt
+@@ -16,6 +16,13 @@ import java.util.ArrayList
+ 
+ class CustomScreenStackHeaderConfig(private val context: ReactContext) : ReactViewGroup(context) {
+ 
++  // ActivityIndicator size çevirimi için yardımcı metod
++  private fun convertStringSizeToNumber(size: Any?): Float {
++      if (size is String && size == "large") return 36f
++      if (size is String && size == "small") return 24f
++      return if (size is Number) size.toFloat() else 36f
++  }
++
+   private var mTitleTextAttributes: ReadableMap? = null
+   private var mLargeTitleTextAttributes: ReadableMap? = null
+   var backButtonInCustomView = false
+@@ -68,7 +75,9 @@ class CustomScreenStackHeaderConfig(private val context: ReactContext) : ReactVi
+     var i = 0
+     val length = array.size()
+     while (i < length) {
+-      result.add(array.getDynamic(i))
++      val item = array.getDynamic(i)
++      if (item.hasKey("size") && item.getType("size") == ReadableType.String) item.putDouble("size", convertStringSizeToNumber(item.getString("size")).toDouble())
++      result.add(item)
+       i++
+     }
+     return result
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/Screen.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/Screen.kt
+index 0ad00f7..a6e8c0c 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/Screen.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/screens/Screen.kt
+@@ -16,6 +16,13 @@ import java.util.ArrayList
+ 
+ class Screen constructor(context: ThemedReactContext) : ViewGroup(context) {
+ 
++  // ActivityIndicator size çevirimi için yardımcı metod
++  private fun convertActivityIndicatorSize(size: Any?): Float {
++      if (size is String && size == "large") return 36f
++      if (size is String && size == "small") return 24f
++      return if (size is Number) size.toFloat() else 36f
++  }
++
+   var fragment: ScreenFragment? = null
+   private var mTransitioning = false
+   private var activityState = 0 

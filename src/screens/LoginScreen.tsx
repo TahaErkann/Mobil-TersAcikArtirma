@@ -38,18 +38,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
     try {
       // Auth Context üzerinden giriş yap
-      const result = await login(email, password);
-      
-      if (result.success) {
-        // Giriş başarılı, kullanıcı otomatik olarak ana sayfaya yönlendirilecek
-        console.log('Giriş başarılı');
-      } else {
-        // Giriş başarısız
-        Alert.alert('Hata', 'Email veya şifre hatalı');
-      }
+      await login(email, password);
+      // Giriş işlemi başarılı olduğunda login fonksiyonu Promise.resolve() ile dönüyor
+      // ve useAuth hook'taki error değeri null oluyor
+      console.log('Giriş işlemi tamamlandı');
     } catch (err) {
+      // Hata zaten AuthContext içinde ele alınıyor, burada ek bir işlem yapmaya gerek yok
       console.error('Giriş hatası:', err);
-      Alert.alert('Hata', 'Giriş yapılırken bir hata oluştu');
     } finally {
       setLoading(false);
     }

@@ -3,6 +3,13 @@ import { Platform, UIManager, Text, TextInput, ActivityIndicator } from 'react-n
 import { registerRootComponent } from 'expo';
 import App from './App';
 
+// ----------------------------------------
+// React Native Screens'i devre dışı bırak
+// Bu, eski navigasyon mimarisini kullanmayı sağlar
+// ----------------------------------------
+import { enableScreens } from 'react-native-screens';
+enableScreens(false);
+
 // ------------------------
 // React Native Yeni Mimari Düzeltmeleri
 // ------------------------
@@ -13,6 +20,20 @@ const SIZES = {
   large: 36,
   default: 36
 };
+
+// ActivityIndicator bileşenini düzeltmek için orijinal render metodunu kaydedelim
+const originalRender = ActivityIndicator.render;
+if (originalRender) {
+  ActivityIndicator.render = function (...args) {
+    // props değerlerini kontrol et
+    const props = args[0] || {};
+    if (props.hasOwnProperty('size') && typeof props.size === 'string') {
+      // String boyut değerini sayısal değere dönüştür
+      props.size = SIZES[props.size] || SIZES.default;
+    }
+    return originalRender.apply(this, args);
+  };
+}
 
 // String boyut değerlerini sayısal değerlere dönüştürmek için orijinal bileşeni monkeypatch
 const originalSetNativeProps = ActivityIndicator.prototype.setNativeProps;
@@ -45,6 +66,17 @@ if (Platform.OS === 'android') {
     };
   }
 }
+
+// Orijinal ActivityIndicator bileşenini özelleştir
+const OriginalActivityIndicator = ActivityIndicator;
+ActivityIndicator = function CustomActivityIndicator(props) {
+  const newProps = { ...props };
+  if (typeof newProps.size === 'string') {
+    newProps.size = SIZES[newProps.size] || SIZES.default;
+  }
+  return OriginalActivityIndicator(newProps);
+};
+ActivityIndicator.displayName = 'ActivityIndicator';
 
 // Hata mesajlarını filtrele
 console.disableYellowBox = true;

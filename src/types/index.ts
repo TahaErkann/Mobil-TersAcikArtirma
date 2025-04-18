@@ -76,23 +76,40 @@ export interface AuthResult {
 // Auth Context
 export interface AuthContextType {
   user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<AuthResult>;
-  register: (name: string, email: string, password: string) => Promise<AuthResult>;
-  logout: () => void;
-  updateUser: (user: User) => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
 }
 
 // Auth State
 export interface AuthState {
   user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
 }
 
 // AsyncStorage anahtar isimleri
 export const STORAGE_KEYS = {
-  TOKEN: 'ters_artirma_token',
-  USER: 'ters_artirma_user'
-}; 
+  TOKEN: 'token',
+  USER: 'user'
+};
+
+// Stats - İstatistik verileri
+export interface Stats {
+  totalUsers: number;
+  pendingUsers: number;
+  activeUsers: number;
+  totalListings: number;
+  pendingListings: number;
+  activeListings: number;
+  completedListings: number;
+  totalCategories: number;
+  totalBids: number;
+} 

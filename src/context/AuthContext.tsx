@@ -1,168 +1,238 @@
 import React, { createContext, useReducer, useEffect } from 'react';
-import { AuthContextType, AuthState, User, STORAGE_KEYS } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isTokenValid, getCurrentUser, login as loginService, register as registerService } from '../services/authService';
+import { User } from '../types';
+import authService from '../services/authService';
 import { ActivityIndicator, View, Text } from 'react-native';
 
-// Başlangıç durumu - loading false olarak başlatıyoruz
+// Context tipleri
+interface AuthState {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: string | null;
+}
+
+type AuthAction =
+  | { type: 'LOGIN_SUCCESS'; payload: { user: User; token: string } }
+  | { type: 'REGISTER_SUCCESS'; payload: { user: User; token: string } }
+  | { type: 'AUTH_ERROR'; payload: string }
+  | { type: 'LOGOUT' }
+  | { type: 'CLEAR_ERROR' }
+  | { type: 'SET_LOADING'; payload: boolean };
+
+interface AuthContextProps {
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  error: string | null;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
+}
+
+// Başlangıç durumu
 const initialState: AuthState = {
   user: null,
-  loading: false,
-  error: null
+  token: null,
+  isAuthenticated: false,
+  loading: true,
+  error: null,
 };
 
-// Context oluştur
-export const AuthContext = createContext<AuthContextType>({
-  ...initialState,
-  login: async () => ({ success: false }),
-  register: async () => ({ success: false }),
-  logout: () => {},
-  updateUser: () => {}
-});
-
-// Reducer Aksiyonları
-type AuthAction =
-  | { type: 'LOGIN_SUCCESS'; payload: User }
-  | { type: 'LOGIN_FAILURE'; payload: string }
-  | { type: 'LOGOUT' }
-  | { type: 'UPDATE_USER'; payload: User }
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'CLEAR_ERROR' };
-
-// Reducer
+// Reducer fonksiyonu
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   switch (action.type) {
     case 'LOGIN_SUCCESS':
+    case 'REGISTER_SUCCESS':
       return {
         ...state,
-        user: action.payload,
+        user: action.payload.user,
+        token: action.payload.token,
+        isAuthenticated: true,
         loading: false,
-        error: null
+        error: null,
       };
-    case 'LOGIN_FAILURE':
+    case 'AUTH_ERROR':
       return {
         ...state,
-        user: null,
+        error: action.payload,
         loading: false,
-        error: action.payload
       };
     case 'LOGOUT':
       return {
         ...state,
         user: null,
+        token: null,
+        isAuthenticated: false,
         loading: false,
-        error: null
-      };
-    case 'UPDATE_USER':
-      return {
-        ...state,
-        user: action.payload
-      };
-    case 'SET_LOADING':
-      return {
-        ...state,
-        loading: action.payload
       };
     case 'CLEAR_ERROR':
       return {
         ...state,
-        error: null
+        error: null,
+      };
+    case 'SET_LOADING':
+      return {
+        ...state,
+        loading: action.payload,
       };
     default:
       return state;
   }
 };
 
-// Provider
-interface AuthProviderProps {
-  children: React.ReactNode;
-}
+// Context oluşturma
+export const AuthContext = createContext<AuthContextProps>({
+  ...initialState,
+  login: async () => {},
+  register: async () => {},
+  logout: async () => {},
+  clearError: () => {},
+});
 
-export const AuthProvider = ({ children }: AuthProviderProps) => {
+// Provider bileşeni
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Kullanıcı bilgilerini yükleme
+  // Sayfa yüklenirken kullanıcı oturumunu kontrol et
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+        dispatch({ type: 'SET_LOADING', payload: true });
         
-        if (token && isTokenValid(token)) {
-          dispatch({ type: 'SET_LOADING', payload: true });
+        // Token var mı ve geçerli mi kontrol et
+        const isAuth = await authService.isAuthenticated();
+        
+        if (isAuth) {
           try {
-            const user = await getCurrentUser();
-            dispatch({ type: 'LOGIN_SUCCESS', payload: user });
-          } catch (error) {
-            await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
-            await AsyncStorage.removeItem(STORAGE_KEYS.USER);
-            dispatch({ type: 'LOGIN_FAILURE', payload: 'Oturum süresi doldu. Lütfen tekrar giriş yapın.' });
-            console.error('Kullanıcı bilgilerini yüklerken hata:', error);
+            // Kullanıcı bilgilerini al
+            const user = await authService.getCurrentUser();
+            const token = await AsyncStorage.getItem('token');
+            
+            dispatch({
+              type: 'LOGIN_SUCCESS',
+              payload: { user, token: token || '' },
+            });
+          } catch (userError) {
+            console.error('Kullanıcı bilgileri alınamadı:', userError);
+            // Kullanıcı bilgisi alınamadıysa sessiz kalmak yerine
+            // token'ı temizle ve kullanıcı oturumunu kapat
+            await AsyncStorage.removeItem('token');
+            dispatch({ type: 'LOGOUT' });
           }
+        } else {
+          dispatch({ type: 'LOGOUT' });
         }
       } catch (error) {
-        console.error('Kullanıcı bilgilerini yüklerken hata:', error);
+        console.error('Oturum kontrolü hatası:', error);
+        // Hata mesajını gösterme ancak kullanıcı oturumunu kapat
+        dispatch({ type: 'LOGOUT' });
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
       }
     };
 
     loadUser();
   }, []);
 
-  // Her işlem öncesinde hata mesajını temizleme
-  const clearError = () => {
-    dispatch({ type: 'CLEAR_ERROR' });
-  };
-
-  // Giriş yap
+  // Login fonksiyonu
   const login = async (email: string, password: string) => {
     try {
-      // Önceki hataları temizle
-      clearError();
-      
       dispatch({ type: 'SET_LOADING', payload: true });
-      const { token, user } = await loginService({ email, password });
-      await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token);
-      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-      dispatch({ type: 'LOGIN_SUCCESS', payload: user });
-      return { success: true };
+      dispatch({ type: 'CLEAR_ERROR' }); // Önceki hataları temizle
+      
+      // authService ile giriş yap
+      const data = await authService.login(email, password);
+      
+      if (!data || !data.user || !data.token) {
+        throw new Error('Geçersiz giriş yanıtı: Kullanıcı veya token bilgisi eksik');
+      }
+      
+      dispatch({
+        type: 'LOGIN_SUCCESS',
+        payload: data,
+      });
     } catch (error: any) {
-      const errorMessage = error.message || 'Email veya şifre hatalı.';
-      dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
-      console.error('Giriş işlemi başarısız:', errorMessage);
-      return { success: false, error: errorMessage };
+      console.error('Giriş başarısız:', error);
+      
+      // Hata mesajını daha kullanıcı dostu yap
+      let errorMessage = 'Giriş yapılırken bir sorun oluştu';
+      
+      if (error.message?.includes('E-posta veya şifre')) {
+        errorMessage = 'Hatalı e-posta veya şifre girdiniz';
+      } else if (error.message?.includes('Kullanıcı bilgileri alınamadı')) {
+        errorMessage = 'Kullanıcı bilgileri alınamadı, lütfen tekrar deneyin';
+      } else if (error.message?.includes('internet')) {
+        errorMessage = 'İnternet bağlantınızı kontrol edin';
+      }
+      
+      dispatch({
+        type: 'AUTH_ERROR',
+        payload: errorMessage,
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
-  // Kayıt ol
+  // Register fonksiyonu
   const register = async (name: string, email: string, password: string) => {
     try {
-      // Önceki hataları temizle
-      clearError();
-      
       dispatch({ type: 'SET_LOADING', payload: true });
-      const { token, user } = await registerService({ name, email, password });
-      await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, token);
-      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-      dispatch({ type: 'LOGIN_SUCCESS', payload: user });
-      return { success: true };
+      dispatch({ type: 'CLEAR_ERROR' }); // Önceki hataları temizle
+      
+      // authService ile kayıt ol
+      const data = await authService.register(name, email, password);
+      
+      if (!data || !data.user || !data.token) {
+        throw new Error('Geçersiz kayıt yanıtı: Kullanıcı veya token bilgisi eksik');
+      }
+      
+      dispatch({
+        type: 'REGISTER_SUCCESS',
+        payload: data,
+      });
     } catch (error: any) {
-      const errorMessage = error.message || 'Kayıt işlemi başarısız oldu.';
-      dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
-      console.error('Kayıt işlemi başarısız:', errorMessage);
-      return { success: false, error: errorMessage };
+      console.error('Kayıt başarısız:', error);
+      
+      // Hata mesajını daha kullanıcı dostu yap
+      let errorMessage = 'Kayıt olurken bir sorun oluştu';
+      
+      if (error.message?.includes('zaten var')) {
+        errorMessage = 'Bu e-posta adresi ile kayıtlı bir kullanıcı zaten var';
+      } else if (error.message?.includes('geçerli')) {
+        errorMessage = 'Lütfen geçerli bir e-posta adresi girin';
+      } else if (error.message?.includes('internet')) {
+        errorMessage = 'İnternet bağlantınızı kontrol edin';
+      } else if (error.message?.includes('şifre')) {
+        errorMessage = error.message; // Şifre ile ilgili hatayı doğrudan göster
+      }
+      
+      dispatch({
+        type: 'AUTH_ERROR',
+        payload: errorMessage,
+      });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
-  // Çıkış yap
+  // Logout fonksiyonu
   const logout = async () => {
-    await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
-    await AsyncStorage.removeItem(STORAGE_KEYS.USER);
-    dispatch({ type: 'LOGOUT' });
+    try {
+      await authService.logout();
+      dispatch({ type: 'LOGOUT' });
+    } catch (error: any) {
+      console.error('Çıkış hatası:', error.message);
+    }
   };
 
-  // Kullanıcı bilgilerini güncelle
-  const updateUser = async (user: User) => {
-    await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-    dispatch({ type: 'UPDATE_USER', payload: user });
+  // Hata temizleme
+  const clearError = () => {
+    dispatch({ type: 'CLEAR_ERROR' });
   };
 
   // Yükleme durumunda ekranda gösterilecek içerik
@@ -171,7 +241,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' }}>
         <ActivityIndicator
           color="#4F46E5"
-          size={30}
+          size={52}
         />
         <Text style={{ marginTop: 16, color: '#4B5563' }}>Giriş bilgileri kontrol ediliyor...</Text>
       </View>
@@ -182,12 +252,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     <AuthContext.Provider
       value={{
         user: state.user,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
         loading: state.loading,
         error: state.error,
         login,
         register,
         logout,
-        updateUser
+        clearError,
       }}
     >
       {children}
