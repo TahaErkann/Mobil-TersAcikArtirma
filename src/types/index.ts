@@ -31,11 +31,21 @@ export interface Category {
   updatedAt: string;
 }
 
+// İlan öğesi - ilan içindeki her bir ürün
+export interface ListingItem {
+  name: string;
+  quantity: number;
+  unit: string; // "Adet", "Koli", "Takım" vb.
+  description?: string;
+}
+
 // Teklif
 export interface Bid {
   _id: string;
   bidder: User | string;
   price: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  expiresAt: string;
   createdAt: string;
 }
 
@@ -46,11 +56,9 @@ export interface Listing {
   description: string;
   category: Category | string;
   owner: User | string;
-  quantity: number;
-  unit: string;
+  items: ListingItem[];
   initialMaxPrice: number;
-  currentPrice?: number;
-  images: string[];
+  currentPrice: number;
   bids: Bid[];
   status: 'active' | 'completed' | 'cancelled' | 'expired';
   expiresAt: string;

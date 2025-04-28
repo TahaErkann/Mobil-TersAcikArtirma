@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { SocketProvider } from './src/context/SocketContext';
 import AppNavigator from './src/navigation/AppNavigator';
+import Toast from 'react-native-toast-message';
 
 // TypeScript için global değişken tanımı
 declare global {
@@ -37,6 +38,7 @@ export default function App() {
         <AuthProvider>
           <SocketProvider>
             <AppNavigator />
+            <Toast />
           </SocketProvider>
         </AuthProvider>
       </PaperProvider>

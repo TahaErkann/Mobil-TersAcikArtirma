@@ -5,6 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../hooks/useAuth';
 import { View, Text, ActivityIndicator } from 'react-native';
+import { RootStackParamList } from './types';
 
 // Ekranlar
 import LoginScreen from '../screens/LoginScreen';
@@ -14,6 +15,7 @@ import CategoriesScreen from '../screens/CategoriesScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import ListingDetailScreen from '../screens/ListingDetailScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
+import CreateListingScreen from '../screens/CreateListingScreen';
 
 // Admin Ekranları
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
@@ -25,6 +27,8 @@ import AdminCategoriesScreen from '../screens/AdminCategoriesScreen';
 type MainStackParamList = {
   Main: undefined;
   ListingDetail: { id: string };
+  CreateListing: undefined;
+  Home: undefined;
 };
 
 type AdminStackParamList = {
@@ -38,7 +42,7 @@ type AuthStackParamList = {
   Register: undefined;
 };
 
-const Stack = createNativeStackNavigator<MainStackParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
 const AdminStackNav = createNativeStackNavigator<AdminStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -237,6 +241,11 @@ const MainStack = () => (
       name="ListingDetail"
       component={ListingDetailScreen}
       options={{ title: 'İlan Detayı' }}
+    />
+    <Stack.Screen
+      name="CreateListing"
+      component={CreateListingScreen}
+      options={{ title: 'Yeni İlan Oluştur' }}
     />
   </Stack.Navigator>
 );

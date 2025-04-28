@@ -101,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const loadUser = async () => {
       try {
-        dispatch({ type: 'SET_LOADING', payload: true });
+          dispatch({ type: 'SET_LOADING', payload: true });
         
         // Token var mı ve geçerli mi kontrol et
         const isAuth = await authService.isAuthenticated();
@@ -224,7 +224,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await authService.logout();
-      dispatch({ type: 'LOGOUT' });
+    dispatch({ type: 'LOGOUT' });
     } catch (error: any) {
       console.error('Çıkış hatası:', error.message);
     }

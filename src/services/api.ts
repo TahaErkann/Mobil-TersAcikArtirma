@@ -62,10 +62,12 @@ api.interceptors.request.use(
     // API URL'i logla
     console.log(`API isteği: ${config.url} ${config.method} ${config.baseURL}`);
     
+    console.log('API İsteği:', config.url, config.data);
+    
     return config;
   },
   (error) => {
-    console.error('API istek hatası:', error);
+    console.error('API İstek Hatası:', error);
     return Promise.reject(error);
   }
 );
@@ -82,24 +84,8 @@ api.interceptors.response.use(
     
     return response;
   },
-  async (error: AxiosError) => {
-    if (error.response) {
-      console.error(`API hata yanıtı: ${error.response.status} ${JSON.stringify(error.response.data)} ${error.config?.url}`, error.message);
-      
-      // 401 Unauthorized hatası - token süresi doldu
-      if (error.response.status === 401) {
-        await AsyncStorage.removeItem('token'); // Token'ı temizle
-        // Burada istersen login sayfasına yönlendirme yapabilirsin
-      }
-    } else if (error.request) {
-      // İstek yapıldı ama yanıt alınamadı - network hatası
-      console.error('NETWORK HATASI: Sunucuya erişilemiyor!', error.config);
-      console.error('Sunucu çalışıyor mu kontrol edilmeli: npm run dev');
-    } else {
-      // İstek yapılamadı
-      console.error('API istek hatası:', error.message);
-    }
-    
+  (error) => {
+    console.error('API Yanıt Hatası:', error.response?.data || error.message);
     return Promise.reject(error);
   }
 );

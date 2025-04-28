@@ -1,28 +1,263 @@
 import api from './api';
-import { Listing, ApiResponse } from '../types';
+import { Listing, ApiResponse, Bid, ListingItem } from '../types';
 
-// İlanları getir - İsteğe bağlı kategori filtresi ile
-export const getAllListings = async (categoryId?: string): Promise<Listing[]> => {
+/**
+ * Tüm ilanları getir
+ */
+export const getAllListings = async (): Promise<Listing[]> => {
   try {
-    // Kategori ID'si varsa, buna göre filtrele
-    const endpoint = categoryId 
-      ? `/listings?category=${categoryId}` 
-      : '/listings';
+    const response = await api.get('/listings');
+    return response.data;
+  } catch (error) {
+    console.error('İlan listeleme hatası:', error);
+    throw new Error('İlanlar yüklenirken bir hata oluştu');
+  }
+};
+
+/**
+ * Kategori ID'sine göre ilanları getir
+ */
+export const getListingsByCategory = async (categoryId: string): Promise<Listing[]> => {
+  try {
+    const response = await api.get(`/listings/category/${categoryId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Kategoriye göre ilan listeleme hatası:', error);
+    throw new Error('İlanlar yüklenirken bir hata oluştu');
+  }
+};
+
+/**
+ * ID'ye göre ilan detayını getir
+ */
+export const getListingById = async (id: string): Promise<Listing> => {
+  try {
+    console.log(`İlan detayı getiriliyor: ${id}`);
+    const response = await api.get(`/listings/${id}`);
+    console.log('Sunucudan dönen ilan verisi:', JSON.stringify(response.data, null, 2));
+    
+    // Veri dönüşümü ve doğrulama
+    let data = response.data;
+    
+    // Items kontrolü
+    if (!data.items) {
+      console.warn('API yanıtında items alanı yok, oluşturuluyor');
       
-    const response = await api.get(endpoint);
-    // API yanıt formatına göre kontrol et
-    if (response.data && Array.isArray(response.data)) {
-      return response.data;
-    } else if (response.data && response.data.data && Array.isArray(response.data.data)) {
-      return response.data.data;
+      // İlanda quantity ve unit bilgisi varsa, bunları kullanarak varsayılan bir öğe oluştur
+      if (data.quantity !== undefined && data.unit) {
+        console.log(`API yanıtındaki quantity (${data.quantity}) ve unit (${data.unit}) kullanılarak varsayılan ürün oluşturuluyor`);
+        
+        // İlan başlığını kullanarak bir ürün oluştur
+        data.items = [{
+          name: data.title || 'Ürün',
+          quantity: data.quantity || 1,
+          unit: data.unit || 'Adet',
+          description: data.description || ''
+        }];
+      } else {
+        // Hiçbir bilgi yoksa boş dizi olarak ayarla
+        data.items = [];
+      }
+    } else if (!Array.isArray(data.items)) {
+      console.warn('API yanıtında items bir dizi değil, dönüştürülüyor:', data.items);
+      try {
+        // String olarak gelmişse parse etmeyi dene
+        if (typeof data.items === 'string') {
+          data.items = JSON.parse(data.items);
+        }
+        
+        // Yine de dizi değilse, ve quantity/unit bilgisi varsa kullan
+        if (!Array.isArray(data.items)) {
+          if (data.quantity !== undefined && data.unit) {
+            data.items = [{
+              name: data.title || 'Ürün',
+              quantity: data.quantity || 1,
+              unit: data.unit || 'Adet',
+              description: data.description || ''
+            }];
+          } else {
+            data.items = [];
+          }
+        }
+      } catch (parseError) {
+        console.error('Items dizisi parselenirken hata:', parseError);
+        
+        // Parse hatası durumunda ve quantity/unit bilgisi varsa kullan
+        if (data.quantity !== undefined && data.unit) {
+          data.items = [{
+            name: data.title || 'Ürün',
+            quantity: data.quantity || 1,
+            unit: data.unit || 'Adet',
+            description: data.description || ''
+          }];
+        } else {
+          data.items = [];
+        }
+      }
     }
     
-    console.warn('API listing format uyumsuzluğu:', response.data);
-    // En kötü durumda boş array dön
-    return [];
-  } catch (error: any) {
-    console.error('İlanlar alınırken hata:', error);
-    throw new Error(error.response?.data?.message || 'İlanlar yüklenirken bir hata oluştu');
+    // Dizi olsa bile elemanlarının geçerli olduğunu kontrol et
+    if (Array.isArray(data.items)) {
+      // Items dizisi boşsa ve quantity/unit bilgisi varsa, bir öğe ekle
+      if (data.items.length === 0 && data.quantity !== undefined && data.unit) {
+        data.items.push({
+          name: data.title || 'Ürün',
+          quantity: data.quantity || 1,
+          unit: data.unit || 'Adet',
+          description: data.description || ''
+        });
+      }
+      
+      data.items = data.items.map((item: any) => {
+        // Her bir öğenin geçerli bir ListingItem olduğundan emin ol
+        if (item && typeof item === 'object') {
+          return {
+            name: item.name || 'İsimsiz Ürün',
+            quantity: typeof item.quantity === 'number' ? item.quantity : 1,
+            unit: item.unit || 'Adet',
+            description: item.description || ''
+          };
+        }
+        // Geçersiz öğe ise varsayılan öğe oluştur
+        return {
+          name: 'Geçersiz Ürün',
+          quantity: 1,
+          unit: 'Adet',
+          description: ''
+        };
+      });
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('İlan detay hatası:', error);
+    throw new Error('İlan detayı yüklenirken bir hata oluştu');
+  }
+};
+
+/**
+ * Kullanıcının kendi ilanlarını getir
+ */
+export const getMyListings = async (): Promise<Listing[]> => {
+  try {
+    const response = await api.get('/listings/my-listings');
+    return response.data;
+  } catch (error) {
+    console.error('Kullanıcı ilanları hatası:', error);
+    throw new Error('İlanlarınız yüklenirken bir hata oluştu');
+  }
+};
+
+/**
+ * Kullanıcının verdiği teklifleri getir
+ */
+export const getMyBids = async (): Promise<Bid[]> => {
+  try {
+    const response = await api.get('/bids/my-bids');
+    return response.data;
+  } catch (error) {
+    console.error('Kullanıcı teklifleri hatası:', error);
+    throw new Error('Teklifleriniz yüklenirken bir hata oluştu');
+  }
+};
+
+/**
+ * Yeni ilan oluştur
+ */
+export const createListing = async (listingData: {
+  title: string; 
+  description: string;
+  category: string;
+  location?: string;
+  items: ListingItem[];
+  initialMaxPrice: number;
+  expiresAt: string;
+  quantity: number;
+  unit: string;
+}): Promise<Listing> => {
+  try {
+    const response = await api.post('/listings', listingData);
+    return response.data;
+  } catch (error) {
+    console.error('İlan oluşturma hatası:', error);
+    throw error;
+  }
+};
+
+/**
+ * İlan güncelle
+ */
+export const updateListing = async (id: string, listingData: Partial<Listing>): Promise<Listing> => {
+  try {
+    const response = await api.put(`/listings/${id}`, listingData);
+    return response.data;
+  } catch (error) {
+    console.error('İlan güncelleme hatası:', error);
+    throw new Error('İlan güncellenirken bir hata oluştu');
+  }
+};
+
+/**
+ * İlan sil
+ */
+export const deleteListing = async (id: string): Promise<void> => {
+  try {
+    await api.delete(`/listings/${id}`);
+  } catch (error) {
+    console.error('İlan silme hatası:', error);
+    throw new Error('İlan silinirken bir hata oluştu');
+  }
+};
+
+/**
+ * İlana teklif ver
+ */
+export const placeBid = async (listingId: string, price: number): Promise<Bid> => {
+  try {
+    const response = await api.post(`/listings/${listingId}/bid`, { price });
+    return response.data;
+  } catch (error) {
+    console.error('Teklif verme hatası:', error);
+    throw new Error('Teklif verilirken bir hata oluştu');
+  }
+};
+
+/**
+ * Teklifi kabul et
+ */
+export const acceptBid = async (listingId: string, bidId: string): Promise<Listing> => {
+  try {
+    const response = await api.post(`/listings/${listingId}/bids/${bidId}/accept`);
+    return response.data;
+  } catch (error) {
+    console.error('Teklif kabul hatası:', error);
+    throw new Error('Teklif kabul edilirken bir hata oluştu');
+  }
+};
+
+/**
+ * Teklifi reddet
+ */
+export const rejectBid = async (listingId: string, bidId: string): Promise<Listing> => {
+  try {
+    const response = await api.post(`/listings/${listingId}/bids/${bidId}/reject`);
+    return response.data;
+  } catch (error) {
+    console.error('Teklif reddetme hatası:', error);
+    throw new Error('Teklif reddedilirken bir hata oluştu');
+  }
+};
+
+/**
+ * İlanı iptal et
+ */
+export const cancelListing = async (id: string): Promise<Listing> => {
+  try {
+    const response = await api.post(`/listings/${id}/cancel`);
+    return response.data;
+  } catch (error) {
+    console.error('İlan iptal hatası:', error);
+    throw new Error('İlan iptal edilirken bir hata oluştu');
   }
 };
 
@@ -39,72 +274,6 @@ export const getAdminListings = async (): Promise<Listing[]> => {
       console.error('Admin ilanları alınırken hata:', innerError);
       throw new Error(innerError.message || 'Admin ilanları alınırken bir hata oluştu');
     }
-  }
-};
-
-// İlanı ID'ye göre getir
-export const getListingById = async (id: string): Promise<Listing> => {
-  try {
-    const response = await api.get(`/listings/${id}`);
-    return response.data;
-  } catch (error) {
-    console.error(`${id} ID'li ilan getirilirken hata:`, error);
-    throw error;
-  }
-};
-
-// Kullanıcının kendi ilanlarını getir
-export const getMyListings = async (): Promise<Listing[]> => {
-  try {
-    const response = await api.get('/listings/user/mylistings');
-    return response.data;
-  } catch (error) {
-    console.error('Kullanıcı ilanları getirilirken hata:', error);
-    throw error;
-  }
-};
-
-// Kullanıcının teklif verdiği ilanları getir
-export const getMyBids = async (): Promise<Listing[]> => {
-  try {
-    const response = await api.get('/listings/user/mybids');
-    return response.data;
-  } catch (error) {
-    console.error('Kullanıcı teklifleri getirilirken hata:', error);
-    throw error;
-  }
-};
-
-// İlanı iptal et
-export const cancelListing = async (id: string): Promise<Listing> => {
-  try {
-    const response = await api.put(`/listings/${id}/cancel`);
-    return response.data.listing;
-  } catch (error) {
-    console.error('İlan iptal edilirken hata:', error);
-    throw error;
-  }
-};
-
-// İlana teklif ver
-export const placeBid = async (id: string, price: number): Promise<any> => {
-  try {
-    const response = await api.post(`/listings/${id}/bid`, { price });
-    return response.data;
-  } catch (error) {
-    console.error('Teklif verilirken hata:', error);
-    throw error;
-  }
-};
-
-// İlanı tamamla/reddet
-export const completeListing = async (id: string, accept: boolean): Promise<Listing> => {
-  try {
-    const response = await api.put(`/listings/${id}/complete`, { accept });
-    return response.data.listing;
-  } catch (error) {
-    console.error('İlan tamamlanırken hata:', error);
-    throw error;
   }
 };
 
@@ -130,10 +299,10 @@ export const rejectListing = async (listingId: string): Promise<ApiResponse<any>
   }
 };
 
-// İlan güncelleme
-export const updateListing = async (listingId: string, data: Partial<Listing>): Promise<ApiResponse<Listing>> => {
+// İlanı güncelleme
+export const updateListingAdmin = async (listingId: string, data: Partial<Listing>): Promise<ApiResponse<Listing>> => {
   try {
-    const response = await api.put(`/listings/${listingId}`, data);
+    const response = await api.put(`/admin/listings/${listingId}`, data);
     return response.data;
   } catch (error: any) {
     console.error('İlan güncellenirken hata:', error);
@@ -142,9 +311,9 @@ export const updateListing = async (listingId: string, data: Partial<Listing>): 
 };
 
 // Yeni ilan oluşturma
-export const createListing = async (data: Partial<Listing>): Promise<ApiResponse<Listing>> => {
+export const createListingAdmin = async (data: Partial<Listing>): Promise<ApiResponse<Listing>> => {
   try {
-    const response = await api.post('/listings', data);
+    const response = await api.post('/admin/listings', data);
     return response.data;
   } catch (error: any) {
     console.error('İlan oluşturulurken hata:', error);
@@ -153,9 +322,9 @@ export const createListing = async (data: Partial<Listing>): Promise<ApiResponse
 };
 
 // İlanı sil
-export const deleteListing = async (id: string): Promise<void> => {
+export const deleteListingAdmin = async (id: string): Promise<void> => {
   try {
-    await api.delete(`/listings/${id}`);
+    await api.delete(`/admin/listings/${id}`);
   } catch (error) {
     console.error('İlan silinirken hata:', error);
     throw error;
