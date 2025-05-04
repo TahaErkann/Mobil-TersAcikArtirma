@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, ActivityIndicator, RefreshControl, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getAllUsers, approveUser, rejectUser } from '../services/authService';
 import { User } from '../types';
@@ -11,6 +11,9 @@ const AdminUsersScreen = ({ navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   // Kullanıcıları yükle
   const loadUsers = async () => {
@@ -85,29 +88,26 @@ const AdminUsersScreen = ({ navigation }: any) => {
 
   // Kullanıcıyı reddet
   const handleRejectUser = async (user: User) => {
-    Alert.prompt(
-      'Kullanıcıyı Reddet',
-      'Lütfen reddetme nedeninizi girin:',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Reddet',
-          style: 'destructive',
-          onPress: async (reason: string | undefined) => {
-            try {
-              setLoading(true);
-              await rejectUser(user._id, reason || 'Nedeni belirtilmemiş');
-              Alert.alert('Başarılı', `${user.name} kullanıcısı reddedildi`);
-              loadUsers();
-            } catch (error: any) {
-              Alert.alert('Hata', error.message || 'Kullanıcı reddedilirken bir hata oluştu');
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    setSelectedUser(user);
+    setRejectionReason('');
+    setRejectModalVisible(true);
+  };
+
+  // Reddetme işlemini gerçekleştir
+  const confirmRejectUser = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      setLoading(true);
+      await rejectUser(selectedUser._id, rejectionReason || 'Nedeni belirtilmemiş');
+      Alert.alert('Başarılı', `${selectedUser.name} kullanıcısı reddedildi`);
+      setRejectModalVisible(false);
+      loadUsers();
+    } catch (error: any) {
+      Alert.alert('Hata', error.message || 'Kullanıcı reddedilirken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Kullanıcı detaylarını göster
@@ -262,6 +262,48 @@ const AdminUsersScreen = ({ navigation }: any) => {
           />
         </>
       )}
+
+      {/* Reddetme Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={rejectModalVisible}
+        onRequestClose={() => setRejectModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Kullanıcıyı Reddet</Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedUser?.name || 'Kullanıcı'} kullanıcısını reddetme nedeninizi girin:
+            </Text>
+            
+            <TextInput
+              style={styles.reasonInput}
+              placeholder="Reddetme nedeni"
+              value={rejectionReason}
+              onChangeText={setRejectionReason}
+              multiline={true}
+              numberOfLines={3}
+            />
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setRejectModalVisible(false)}
+              >
+                <Text style={styles.buttonText}>İptal</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]} 
+                onPress={confirmRejectUser}
+              >
+                <Text style={styles.buttonText}>Reddet</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -396,6 +438,63 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 16,
     color: '#9ca3af',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    width: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    marginBottom: 15,
+    color: '#666',
+  },
+  reasonInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 20,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    width: '48%',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#9ca3af',
+  },
+  confirmButton: {
+    backgroundColor: '#ef4444',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
