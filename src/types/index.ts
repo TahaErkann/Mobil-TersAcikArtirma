@@ -3,6 +3,8 @@ export interface User {
   _id: string;
   name: string;
   email: string;
+  phone?: string;
+  address?: string;
   profilePicture?: string;
   companyInfo?: {
     companyName?: string;
@@ -43,10 +45,15 @@ export interface ListingItem {
 export interface Bid {
   _id: string;
   bidder: User | string;
+  user?: User | string; // bidder ile aynı, geriye dönük uyumluluk için
   price: number;
+  amount?: number; // price ile aynı, geriye dönük uyumluluk için
   status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  isApproved?: boolean; // Onay durumu, status ile eşgüdümlü
   expiresAt: string;
+  timestamp?: string; // createdAt ile aynı, geriye dönük uyumluluk için
   createdAt: string;
+  updatedAt?: string;
 }
 
 // İlan

@@ -9,8 +9,8 @@ import { STORAGE_KEYS } from '../types';
 const API_URLS = {
   ANDROID_EMULATOR: 'http://10.0.2.2:5001',
   IOS_SIMULATOR: 'http://localhost:5001',
-  DEVELOPMENT: 'http://192.168.69.112:5001',
-  TEST: 'http://192.168.69.112:5001',
+  DEVELOPMENT: 'http://192.168.254.112:5001',
+  TEST: 'http://192.168.254.112:5001',
 };
 
 // Aktif API URL - kendi sunucunuza göre ayarlayın

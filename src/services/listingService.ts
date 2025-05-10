@@ -29,12 +29,74 @@ export const getListingsByCategory = async (categoryId: string): Promise<Listing
 
 /**
  * ID'ye göre ilan detayını getir
+ * @param id İlan ID'si
+ * @param includeFullDetails true ise, teklif veren kullanıcıların tüm bilgilerini (email, phone, address) dahil eder
  */
-export const getListingById = async (id: string): Promise<Listing> => {
+export const getListingById = async (id: string, includeFullDetails: boolean = false): Promise<Listing> => {
   try {
-    console.log(`İlan detayı getiriliyor: ${id}`);
-    const response = await api.get(`/listings/${id}`);
-    console.log('Sunucudan dönen ilan verisi:', JSON.stringify(response.data, null, 2));
+    console.log(`İlan detayı getiriliyor: ${id}, Tam detaylar: ${includeFullDetails}`);
+    
+    // Tam detaylar isteniyorsa özel bir parametre ekle
+    const url = includeFullDetails 
+      ? `/listings/${id}?fullDetails=true` 
+      : `/listings/${id}`;
+      
+    console.log("API istek URL:", url);
+    
+    const response = await api.get(url);
+    
+    // Sadece önemli alanları logla, tüm veriyi değil
+    const bids = response.data.bids || [];
+    console.log(`API yanıtı alındı: ${response.status}, Teklif sayısı: ${bids.length}`);
+    
+    if (bids.length > 0) {
+      // Tam detaylar istendiğinde teklif veren bilgilerini daha ayrıntılı kontrol et
+      if (includeFullDetails) {
+        console.log("Tam teklif detayları kontrol ediliyor...");
+        
+        // Kabul edilmiş teklifleri kontrol et
+        const acceptedBids = bids.filter(bid => bid.status === 'accepted' || bid.isApproved === true);
+        if (acceptedBids.length > 0) {
+          console.log(`${acceptedBids.length} kabul edilmiş teklif bulundu.`);
+          
+          // Teklif veren bilgilerini detaylı kontrol et
+          acceptedBids.forEach((bid: Bid) => {
+            console.log(`Kabul edilen teklif ID: ${bid._id}, Status: ${bid.status}`);
+            
+            if (typeof bid.bidder === 'object' && bid.bidder) {
+              console.log("Teklif veren (bidder) detayları:", {
+                id: bid.bidder._id,
+                name: bid.bidder.name,
+                hasEmail: !!bid.bidder.email,
+                hasPhone: !!bid.bidder.phone,
+                hasAddress: !!bid.bidder.address,
+                hasCompanyInfo: !!bid.bidder.companyInfo && Object.keys(bid.bidder.companyInfo).length > 0
+              });
+            }
+            
+            if (typeof bid.user === 'object' && bid.user) {
+              console.log("Teklif veren (user) detayları:", {
+                id: bid.user._id,
+                name: bid.user.name,
+                hasEmail: !!bid.user.email,
+                hasPhone: !!bid.user.phone,
+                hasAddress: !!bid.user.address,
+                hasCompanyInfo: !!bid.user.companyInfo && Object.keys(bid.user.companyInfo).length > 0
+              });
+            }
+          });
+        }
+      } else {
+        // Normal durum için temel bilgileri logla
+        const firstBid = bids[0];
+        console.log("İlk teklif örneği:", {
+          id: firstBid._id,
+          status: firstBid.status,
+          bidderType: typeof firstBid.bidder,
+          userType: typeof firstBid.user
+        });
+      }
+    }
     
     // Veri dönüşümü ve doğrulama
     let data = response.data;

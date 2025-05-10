@@ -10,10 +10,10 @@ const API_URLS = {
   IOS_SIMULATOR: 'http://localhost:5001/api',
   
   // Development ortamı için (kendi IP adresiniz)
-  DEVELOPMENT: 'http://192.168.69.112:5001/api',
+  DEVELOPMENT: 'http://192.168.254.112:5001/api',
   
   // Test ortamı için (sabit IP)
-  TEST: 'http://192.168.69.112:5001/api',
+  TEST: 'http://192.168.254.112:5001/api',
 };
 
 // Aktif API URL - kendi sunucunuza göre ayarlayın
