@@ -327,7 +327,7 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
     try {
       setError(null);
       setLoading(true);
-      const data = await getListingById(id);
+        const data = await getListingById(id);
       
       // Gelen verileri debug amaçlı logla
       console.log("Gelen ilan verileri özeti:", {
@@ -343,14 +343,14 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
         })) : []
       });
       
-      setListing(data);
+        setListing(data);
     } catch (err) {
       console.error('İlan detayı yüklenirken hata:', err);
       setError('İlan detayı yüklenirken bir hata oluştu. Lütfen tekrar deneyin.');
-    } finally {
-      setLoading(false);
+      } finally {
+        setLoading(false);
       setRefreshing(false);
-    }
+      }
   }, [id]);
   
   // İlk yükleme
@@ -645,7 +645,7 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
       </View>
     );
   }
-  
+
   // Hata durumu
   if (error) {
     return (
@@ -671,7 +671,7 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
       </View>
     );
   }
-  
+
   return (
     <View style={styles.container}>
       <Appbar.Header>
@@ -687,11 +687,11 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
       >
         <View style={styles.detailContainer}>
           {/* Başlık Kısmı */}
-          <Card style={styles.card}>
-            <Card.Content>
+        <Card style={styles.card}>
+          <Card.Content>
               <View style={styles.headerRow}>
                 <View style={styles.titleContainer}>
-                  <Title style={styles.title}>{listing.title}</Title>
+            <Title style={styles.title}>{listing.title}</Title>
                   {getStatusBadge()}
                 </View>
               </View>
@@ -702,12 +702,12 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
                     ? listing.category.name 
                     : 'Kategori'}
                 </Chip>
-                <Chip 
+              <Chip 
                   icon="calendar" 
                   style={styles.chip}
-                >
+              >
                   {listing.createdAt ? safeFormatDate(listing.createdAt) : 'Belirtilmemiş'}
-                </Chip>
+              </Chip>
                 <Chip 
                   icon="clock-outline" 
                   style={styles.chip}
@@ -719,17 +719,17 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
                       ? safeFormatDistanceToNow(listing.expiresAt) 
                       : 'Belirtilmemiş'
                   }
-                </Chip>
-              </View>
+              </Chip>
+            </View>
               
               {listing.description && (
                 <Paragraph style={styles.description}>
                   {listing.description}
                 </Paragraph>
               )}
-              
-              <Divider style={styles.divider} />
-              
+            
+            <Divider style={styles.divider} />
+            
               <View style={styles.priceContainer}>
                 <Text style={styles.priceLabel}>Mevcut Fiyat:</Text>
                 <Text style={styles.price}>{listing.currentPrice} TL</Text>
@@ -855,8 +855,8 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
                                 {safeFormatDate(bid.createdAt)}
                               </Text>
                             </View>
-                          </View>
-                          
+              </View>
+              
                           <View style={styles.bidAmount}>
                             <Text style={styles.bidPrice}>{bid.price} TL</Text>
                             <Chip 
@@ -868,13 +868,13 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
                             >
                               {getBidStatusText(bid.status, safeIsPast(bid.expiresAt))}
                             </Chip>
-                          </View>
-                        </View>
-                        
+              </View>
+            </View>
+            
                         {/* Teklif sahibinin detaylı bilgileri - sadece ilan sahibi ve onaylanan teklifler için */}
                         {bidderVisibility.showDetails && bidder && (
                           <View style={styles.bidderDetailedInfo}>
-                            <Divider style={styles.divider} />
+            <Divider style={styles.divider} />
                             <Text style={styles.bidderDetailTitle}>Teklif Sahibi Bilgileri:</Text>
                             
                             {bidder.email && (
@@ -916,7 +916,7 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
                             >
                               Kabul Et
                             </Button>
-                          </View>
+                    </View>
                         )}
                         
                         {(bid.status === 'pending' && !safeIsPast(bid.expiresAt)) && (
@@ -936,10 +936,10 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
                     </TouchableOpacity>
                   );
                 })
-              )}
-            </Card.Content>
-          </Card>
-          
+            )}
+          </Card.Content>
+        </Card>
+        
           {/* Satıcı Bilgileri */}
           <Card style={styles.card}>
             <Card.Content>
@@ -974,12 +974,12 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
                         ? safeFormatDate(listing.owner.createdAt)
                         : 'Belirtilmemiş'
                     }
-                  </Text>
+              </Text>
                 </View>
               </View>
             </Card.Content>
           </Card>
-          
+        
           {/* İlan İçeriği */}
           <Card style={styles.card}>
             <Card.Content>
