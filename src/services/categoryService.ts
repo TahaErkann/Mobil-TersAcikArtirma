@@ -1,4 +1,4 @@
-import api from './api';
+import api, { apiRequest } from './api';
 import { Category } from '../types';
 
 /**
@@ -6,8 +6,8 @@ import { Category } from '../types';
  */
 export const getAllCategories = async (): Promise<Category[]> => {
   try {
-    const response = await api.get('/categories');
-    return response.data;
+    const data = await apiRequest<Category[]>('get', '/categories');
+    return data;
   } catch (error) {
     console.error('Kategori listeleme hatası:', error);
     throw new Error('Kategoriler yüklenirken bir hata oluştu');

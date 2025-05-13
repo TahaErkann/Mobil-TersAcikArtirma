@@ -7,7 +7,8 @@ import {
   RefreshControl,
   Alert,
   FlatList,
-  Linking
+  Linking,
+  ImageBackground
 } from 'react-native';
 import { 
   Text, 
@@ -27,7 +28,8 @@ import {
   List,
   Subheading,
   ActivityIndicator,
-  Caption
+  Caption,
+  IconButton
 } from 'react-native-paper';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -44,6 +46,7 @@ import {
   getBidStatusColor,
   getBidStatusText
 } from '../utils/formatters';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type ListingDetailScreenProps = {
   route: RouteProp<RootStackParamList, 'ListingDetail'>;
@@ -57,7 +60,8 @@ const BidderDetailDialog = ({
   onClose,
   getBidStatusColor,
   getBidStatusText,
-  safeFormatDate
+  safeFormatDate,
+  isOwner
 }: { 
   selectedBid: Bid | null;
   onRefresh: () => void;
@@ -65,6 +69,7 @@ const BidderDetailDialog = ({
   getBidStatusColor: (status: string, isExpired: boolean) => string;
   getBidStatusText: (status: string, isExpired: boolean) => string;
   safeFormatDate: (dateStr: string | undefined | null, formatStr?: string) => string;
+  isOwner: boolean;
 }) => {
   if (!selectedBid) {
     return (
@@ -109,7 +114,7 @@ const BidderDetailDialog = ({
         <View>
           <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Kullanıcı bilgileri yüklenemedi</Text>
           <Text style={{ marginBottom: 8 }}>Teklif veren kullanıcı bilgileri eksik veya hatalı.</Text>
-          <Text style={{ marginBottom: 16 }}>Lütfen önce sayfayı yenileyip tekrar deneyiniz.</Text>
+          <Text style={{ marginBottom: 16 }}>Lütfen önce sayfı yenileyip tekrar deneyiniz.</Text>
           <Button 
             mode="contained" 
             onPress={() => {
@@ -118,8 +123,31 @@ const BidderDetailDialog = ({
             }}
             style={{ marginTop: 8 }}
           >
-            Sayfayı Yenile
+            Sayfı Yenile
           </Button>
+        </View>
+      </Dialog.Content>
+    );
+  }
+  
+  // Teklif durumu ve izin kontrolü
+  const isAccepted = selectedBid.status === 'accepted' || selectedBid.isApproved === true;
+  
+  // İlan sahibi değilse ve teklif kabul edilmemişse, sınırlı bilgi göster
+  if (!isOwner && !isAccepted) {
+    return (
+      <Dialog.Content>
+        <View>
+          <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Teklif Detayları</Text>
+          <Text style={{ marginBottom: 8 }}>Bu teklifin detaylı bilgilerine erişim izniniz yok.</Text>
+          <Text style={{ marginBottom: 16 }}>Teklif bilgileri gizlilik politikası gereği korunmaktadır.</Text>
+          
+          <View style={{ backgroundColor: '#f5f5f5', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+            <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>Teklif Özeti:</Text>
+            <Text>Teklif Tutarı: {selectedBid.price || selectedBid.amount || 0} TL</Text>
+            <Text>Durum: {getBidStatusText(selectedBid.status, false)}</Text>
+            <Text>Tarih: {safeFormatDate(selectedBid.createdAt || selectedBid.timestamp)}</Text>
+          </View>
         </View>
       </Dialog.Content>
     );
@@ -129,13 +157,14 @@ const BidderDetailDialog = ({
   const hasDetailedInfo = bidder.email || bidder.phone || bidder.address || 
                          (bidder.companyInfo && Object.keys(bidder.companyInfo).length > 0);
   
-  if (!hasDetailedInfo) {
+  // Kabul edilmiş teklifte detaylı bilgi yoksa
+  if (isAccepted && isOwner && !hasDetailedInfo) {
     return (
       <Dialog.Content>
         <View>
           <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Detaylı kullanıcı bilgileri bulunamadı</Text>
           <Text style={{ marginBottom: 8 }}>Teklif sahibinin bilgileri sistem tarafından tam olarak alınamadı.</Text>
-          <Text style={{ marginBottom: 16 }}>Bilgileri almak için lütfen önce sayfayı yenileyin.</Text>
+          <Text style={{ marginBottom: 16 }}>Bilgileri almak için lütfen önce sayfı yenileyin.</Text>
           
           <View style={{ backgroundColor: '#f5f5f5', padding: 12, borderRadius: 8, marginBottom: 16 }}>
             <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>Mevcut Bilgiler:</Text>
@@ -153,7 +182,7 @@ const BidderDetailDialog = ({
             }}
             style={{ marginTop: 8 }}
           >
-            Sayfayı Yenile
+            Sayfı Yenile
           </Button>
         </View>
       </Dialog.Content>
@@ -201,97 +230,46 @@ const BidderDetailDialog = ({
             description={safeFormatDate(selectedBid.createdAt || selectedBid.timestamp)}
             left={props => <List.Icon {...props} icon="calendar" />}
           />
-        </List.Section>
-        
-        <Divider style={styles.divider} />
-        
-        <List.Section title="İletişim Bilgileri">
-          {bidder.email && (
-            <List.Item
-              title="E-posta"
-              description={bidder.email}
-              left={props => <List.Icon {...props} icon="email" />}
-              right={props => 
-                <TouchableOpacity 
-                  onPress={() => Linking.openURL(`mailto:${bidder.email}`)}
-                  style={{ justifyContent: 'center' }}
-                >
-                  <Ionicons name="mail-open-outline" size={24} color="#4F46E5" />
-                </TouchableOpacity>
-              }
-            />
-          )}
           
-          {bidder.phone && (
+          {isAccepted && (
             <List.Item
-              title="Telefon"
-              description={bidder.phone}
-              left={props => <List.Icon {...props} icon="phone" />}
-              right={props => 
-                <TouchableOpacity 
-                  onPress={() => Linking.openURL(`tel:${bidder.phone}`)}
-                  style={{ justifyContent: 'center' }}
-                >
-                  <Ionicons name="call-outline" size={24} color="#4F46E5" />
-                </TouchableOpacity>
-              }
-            />
-          )}
-          
-          {bidder.address && (
-            <List.Item
-              title="Adres"
-              description={bidder.address}
-              left={props => <List.Icon {...props} icon="map-marker" />}
+              title="Kabul Edilme Tarihi"
+              description={safeFormatDate(selectedBid.updatedAt || selectedBid.acceptedAt)}
+              left={props => <List.Icon {...props} icon="check-circle" />}
             />
           )}
         </List.Section>
         
-        {hasCompanyInfo && (
+        {/* İletişim bilgileri - Sadece ilan sahibi veya kabul edilmiş teklif ise göster */}
+        {(isOwner && isAccepted) && (
           <>
             <Divider style={styles.divider} />
             
-            <List.Section title="Firma Bilgileri">
-              {bidder.companyInfo?.companyName && (
+            <List.Section title="İletişim Bilgileri">
+              {bidder.email && (
                 <List.Item
-                  title="Firma Adı"
-                  description={bidder.companyInfo.companyName}
-                  left={props => <List.Icon {...props} icon="domain" />}
-                />
-              )}
-              
-              {bidder.companyInfo?.address && (
-                <List.Item
-                  title="Firma Adresi"
-                  description={bidder.companyInfo.address}
-                  left={props => <List.Icon {...props} icon="map-marker-outline" />}
-                />
-              )}
-              
-              {bidder.companyInfo?.city && (
-                <List.Item
-                  title="Şehir"
-                  description={bidder.companyInfo.city}
-                  left={props => <List.Icon {...props} icon="city" />}
-                />
-              )}
-              
-              {bidder.companyInfo?.taxNumber && (
-                <List.Item
-                  title="Vergi Numarası"
-                  description={bidder.companyInfo.taxNumber}
-                  left={props => <List.Icon {...props} icon="identifier" />}
-                />
-              )}
-              
-              {bidder.companyInfo?.phone && bidder.companyInfo?.phone !== bidder.phone && (
-                <List.Item
-                  title="Firma Telefonu"
-                  description={bidder.companyInfo.phone}
-                  left={props => <List.Icon {...props} icon="phone-outline" />}
+                  title="E-posta"
+                  description={bidder.email}
+                  left={props => <List.Icon {...props} icon="email" />}
                   right={props => 
                     <TouchableOpacity 
-                      onPress={() => Linking.openURL(`tel:${bidder.companyInfo?.phone}`)}
+                      onPress={() => Linking.openURL(`mailto:${bidder.email}`)}
+                      style={{ justifyContent: 'center' }}
+                    >
+                      <Ionicons name="mail-open-outline" size={24} color="#4F46E5" />
+                    </TouchableOpacity>
+                  }
+                />
+              )}
+              
+              {bidder.phone && (
+                <List.Item
+                  title="Telefon"
+                  description={bidder.phone}
+                  left={props => <List.Icon {...props} icon="phone" />}
+                  right={props => 
+                    <TouchableOpacity 
+                      onPress={() => Linking.openURL(`tel:${bidder.phone}`)}
                       style={{ justifyContent: 'center' }}
                     >
                       <Ionicons name="call-outline" size={24} color="#4F46E5" />
@@ -299,7 +277,112 @@ const BidderDetailDialog = ({
                   }
                 />
               )}
+              
+              {bidder.address && (
+                <List.Item
+                  title="Adres"
+                  description={bidder.address}
+                  left={props => <List.Icon {...props} icon="map-marker" />}
+                />
+              )}
             </List.Section>
+            
+            {hasCompanyInfo && (
+              <>
+                <Divider style={styles.divider} />
+                
+                <List.Section title="Firma Bilgileri">
+                  {bidder.companyInfo?.companyName && (
+                    <List.Item
+                      title="Firma Adı"
+                      description={bidder.companyInfo.companyName}
+                      left={props => <List.Icon {...props} icon="domain" />}
+                    />
+                  )}
+                  
+                  {bidder.companyInfo?.taxNumber && (
+                    <List.Item
+                      title="Vergi Numarası"
+                      description={bidder.companyInfo.taxNumber}
+                      left={props => <List.Icon {...props} icon="identifier" />}
+                    />
+                  )}
+                  
+                  {bidder.companyInfo?.taxOffice && (
+                    <List.Item
+                      title="Vergi Dairesi"
+                      description={bidder.companyInfo.taxOffice}
+                      left={props => <List.Icon {...props} icon="office-building" />}
+                    />
+                  )}
+                  
+                  {bidder.companyInfo?.address && (
+                    <List.Item
+                      title="Firma Adresi"
+                      description={bidder.companyInfo.address}
+                      left={props => <List.Icon {...props} icon="map-marker-outline" />}
+                    />
+                  )}
+                  
+                  {bidder.companyInfo?.city && (
+                    <List.Item
+                      title="Şehir"
+                      description={bidder.companyInfo.city}
+                      left={props => <List.Icon {...props} icon="city" />}
+                    />
+                  )}
+                  
+                  {bidder.companyInfo?.phone && bidder.companyInfo?.phone !== bidder.phone && (
+                    <List.Item
+                      title="Firma Telefonu"
+                      description={bidder.companyInfo.phone}
+                      left={props => <List.Icon {...props} icon="phone-outline" />}
+                      right={props => 
+                        <TouchableOpacity 
+                          onPress={() => Linking.openURL(`tel:${bidder.companyInfo?.phone}`)}
+                          style={{ justifyContent: 'center' }}
+                        >
+                          <Ionicons name="call-outline" size={24} color="#4F46E5" />
+                        </TouchableOpacity>
+                      }
+                    />
+                  )}
+                </List.Section>
+              </>
+            )}
+            
+            {/* Diğer profil bilgileri */}
+            {(bidder.birthDate || bidder.gender || bidder.nationalId) && (
+              <>
+                <Divider style={styles.divider} />
+                
+                <List.Section title="Diğer Bilgiler">
+                  {bidder.birthDate && (
+                    <List.Item
+                      title="Doğum Tarihi"
+                      description={safeFormatDate(bidder.birthDate)}
+                      left={props => <List.Icon {...props} icon="cake-variant" />}
+                    />
+                  )}
+                  
+                  {bidder.gender && (
+                    <List.Item
+                      title="Cinsiyet"
+                      description={bidder.gender === 'male' ? 'Erkek' : bidder.gender === 'female' ? 'Kadın' : bidder.gender}
+                      left={props => <List.Icon {...props} icon="account" />}
+                    />
+                  )}
+                  
+                  {bidder.nationalId && (
+                    <List.Item
+                      title="T.C. Kimlik No"
+                      description={bidder.nationalId}
+                      left={props => <List.Icon {...props} icon="card-account-details" />}
+                    />
+                  )}
+                </List.Section>
+              </>
+            )}
           </>
         )}
       </ScrollView>
@@ -327,30 +410,15 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
     try {
       setError(null);
       setLoading(true);
-        const data = await getListingById(id);
-      
-      // Gelen verileri debug amaçlı logla
-      console.log("Gelen ilan verileri özeti:", {
-        id: data._id,
-        title: data.title,
-        bids: data.bids ? data.bids.length : 0,
-        bidTypes: data.bids ? data.bids.map(b => ({
-          id: b._id,
-          bidderType: typeof b.bidder,
-          userType: typeof b.user,
-          bidderPop: b.bidder && typeof b.bidder === 'object' ? 'populated' : 'reference',
-          userPop: b.user && typeof b.user === 'object' ? 'populated' : 'reference'
-        })) : []
-      });
-      
-        setListing(data);
+      const data = await getListingById(id);
+      setListing(data);
     } catch (err) {
       console.error('İlan detayı yüklenirken hata:', err);
       setError('İlan detayı yüklenirken bir hata oluştu. Lütfen tekrar deneyin.');
-      } finally {
-        setLoading(false);
+    } finally {
+      setLoading(false);
       setRefreshing(false);
-      }
+    }
   }, [id]);
   
   // İlk yükleme
@@ -397,8 +465,18 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
       return;
     }
     
-    if (bidValue > listing.currentPrice) {
+    if (bidValue >= listing.currentPrice) {
       Alert.alert('Geçersiz Tutar', 'Teklifiniz mevcut fiyattan düşük olmalıdır. Bu bir ters açık artırmadır.');
+      return;
+    }
+    
+    // Teklif mevcut fiyattan en az %5 düşük olmalı
+    const minimumAcceptablePrice = listing.currentPrice * 0.95;
+    if (bidValue > minimumAcceptablePrice) {
+      Alert.alert(
+        'Yetersiz Teklif', 
+        `Teklifiniz mevcut fiyat olan ${listing.currentPrice.toFixed(2)} TL'den en az %5 daha düşük olmalıdır. En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif edebilirsiniz.`
+      );
       return;
     }
     
@@ -504,46 +582,6 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
            (typeof listing.owner === 'object' && listing.owner._id === user._id);
   };
   
-  // Durum etiketini al 
-  const getStatusBadge = () => {
-    if (!listing) return null;
-    
-    let badgeText = '';
-    let badgeColor = '';
-    
-    switch (listing.status) {
-      case 'active':
-        badgeText = 'Aktif';
-        badgeColor = '#10B981'; // Yeşil
-        break;
-      case 'completed':
-        badgeText = 'Tamamlandı';
-        badgeColor = '#3B82F6'; // Mavi
-        break;
-      case 'cancelled':
-        badgeText = 'İptal Edildi';
-        badgeColor = '#EF4444'; // Kırmızı
-        break;
-      case 'expired':
-        badgeText = 'Süresi Doldu';
-        badgeColor = '#F59E0B'; // Sarı
-        break;
-      default:
-        badgeText = 'Bilinmiyor';
-        badgeColor = '#6B7280'; // Gri
-    }
-    
-    return (
-      <Chip 
-        mode="outlined" 
-        style={[styles.badge, { borderColor: badgeColor }]}
-        textStyle={{ color: badgeColor }}
-      >
-        {badgeText}
-      </Chip>
-    );
-  };
-  
   // İlanın süresi dolmuş mu kontrol et
   const isExpired = (): boolean => {
     if (!listing || !listing.expiresAt) return false;
@@ -553,21 +591,40 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
   // Teklif veren kullanıcının ne kadar görülebilir olduğunu kontrol et
   const getBidderVisibility = (bid: Bid) => {
     // Bidder, user alanını veya bidder alanını kontrol et
-    const bidder = typeof bid.bidder === 'object' ? bid.bidder : null;
+    const bidder = typeof bid.bidder === 'object' ? bid.bidder : 
+                (typeof bid.user === 'object' ? bid.user : null);
     
     if (!bidder) return { showName: false, showDetails: false };
     
     // İlan sahibiyse
     if (isOwner()) {
-      // Sadece kullanıcı adını her zaman göster, detayları sadece onaylanmış tekliflerde göster
+      // Kabul edilmiş tekliflerin tüm detaylarını göster
       return { 
         showName: true, 
-        showDetails: bid.status === 'accepted' || bid.isApproved === true 
+        showDetails: bid.status === 'accepted' || bid.isApproved === true,
+        showFullDetails: bid.status === 'accepted' || bid.isApproved === true 
       };
     }
     
-    // İlan sahibi değilse hiçbir şey gösterme
-    return { showName: false, showDetails: false };
+    // Teklifi veren kullanıcı kendisiyse
+    if (user && (bid.user === user._id || 
+        (typeof bid.user === 'object' && bid.user._id === user._id) ||
+        bid.bidder === user._id || 
+        (typeof bid.bidder === 'object' && bid.bidder._id === user._id))) {
+      // Sadece kendi teklifinin durumunu görsün
+      return { 
+        showName: true, 
+        showDetails: false, 
+        showFullDetails: false 
+      };
+    }
+    
+    // Diğer kullanıcılar için sadece teklifin varlığını ve durumunu göster, kimlik gizli olsun
+    return { 
+      showName: false, 
+      showDetails: false,
+      showFullDetails: false 
+    };
   };
   
   // Teklif detaylarını göster
@@ -579,7 +636,16 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
     );
     
     try {
-      if (bid.status === 'accepted' || bid.isApproved === true) {
+      // Teklif kabul edilmiş mi kontrol et
+      const isAcceptedBid = bid.status === 'accepted' || bid.isApproved === true;
+      
+      // İlan sahibiyse ve teklif kabul edilmişse veya kullanıcı kendi teklifini görüntülüyorsa
+      if ((isOwner() && isAcceptedBid) || 
+          (user && (bid.user === user._id || 
+            (typeof bid.user === 'object' && bid.user._id === user._id) ||
+            bid.bidder === user._id || 
+            (typeof bid.bidder === 'object' && bid.bidder._id === user._id)))) {
+        
         // Önce mevcut teklifi göster
         setSelectedBid(bid);
         
@@ -629,11 +695,36 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
         
         // Detay modalını göster
         setBidderDetailsVisible(true);
+      } else {
+        // İlan sahibi değilse veya teklif kabul edilmemişse
+        Alert.alert(
+          "Erişim Kısıtlı", 
+          "Teklif veren kullanıcının detaylı bilgilerine sadece ilan sahibi erişebilir ve teklif kabul edilmiş olmalıdır."
+        );
       }
     } catch (error) {
       console.error("Teklif detayları gösterilirken hata:", error);
       Alert.alert("Hata", "Teklif detayları gösterilirken bir hata oluştu.");
     }
+  };
+  
+  // Fiyat görüntülemede güvenli kontroller ekleyelim
+  const formatPrice = (price: number | undefined | null): string => {
+    if (price === undefined || price === null) return '0.00';
+    return price.toFixed(2);
+  };
+  
+  // İlan detaylarındaki fiyat görüntüleme kısmını düzenleyelim
+  const renderPriceInfo = () => {
+    // Artık kullanılmıyor - modern tasarımlı fiyat bilgisi doğrudan render içinde gösteriliyor
+    return null;
+  };
+  
+  // Tekliflerin işlenmesi için güvenli kontroller ekleyelim
+  const renderBids = () => {
+    // Artık kullanılmıyor - modern tasarımlı teklifler doğrudan render içinde gösteriliyor
+    // Bu fonksiyon yalnızca geriye dönük uyumluluk için korunmuştur
+    return null;
   };
   
   // Yükleme durumu
@@ -674,10 +765,46 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
 
   return (
     <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction onPress={() => navigation.goBack()} />
-        <Appbar.Content title="İlan Detayı" />
+      <Appbar.Header style={styles.appbar}>
+        <Appbar.BackAction color="#ffffff" onPress={() => navigation.goBack()} />
+        <Appbar.Content title="İlan Detayı" color="#ffffff" />
+        <Appbar.Action icon="share-variant" color="#ffffff" onPress={() => {}} />
       </Appbar.Header>
+      
+      {/* Hero Banner ve İlan Başlığı */}
+      <ImageBackground
+        source={{ uri: `https://source.unsplash.com/random/800x400/?${listing.category.name}` }}
+        style={styles.hero}
+      >
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.8)']}
+          style={styles.heroGradient}
+        >
+          <View style={styles.heroContent}>
+            <View style={styles.heroMeta}>
+              <Chip 
+                style={styles.categoryChipHero}
+                textStyle={styles.categoryChipTextHero}
+              >
+                {typeof listing.category === 'object' ? listing.category.name : 'Kategori'}
+              </Chip>
+              <Chip 
+                icon="clock-outline" 
+                style={styles.timeChip}
+                textStyle={{ color: safeIsPast(listing.expiresAt) ? '#EF4444' : '#FFFFFF' }}
+              >
+                {safeIsPast(listing.expiresAt) 
+                  ? 'Süresi Doldu' 
+                  : listing.expiresAt 
+                    ? safeFormatDistanceToNow(listing.expiresAt) 
+                    : 'Belirtilmemiş'
+                }
+              </Chip>
+            </View>
+            <Title style={styles.heroTitle}>{listing.title}</Title>
+          </View>
+        </LinearGradient>
+      </ImageBackground>
       
       <ScrollView 
         style={styles.scrollView}
@@ -686,70 +813,84 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
         }
       >
         <View style={styles.detailContainer}>
-          {/* Başlık Kısmı */}
-        <Card style={styles.card}>
-          <Card.Content>
-              <View style={styles.headerRow}>
-                <View style={styles.titleContainer}>
-            <Title style={styles.title}>{listing.title}</Title>
-                  {getStatusBadge()}
+          {/* Fiyat ve Teklif Bilgisi */}
+          <Card style={styles.cardPrimary}>
+            <Card.Content style={styles.priceCardContent}>
+              <View style={styles.currentPriceSection}>
+                <Text style={styles.priceHeading}>Güncel Fiyat</Text>
+                <Text style={styles.currentPrice}>{formatPrice(listing.currentPrice)} ₺</Text>
+                {listing.initialMaxPrice && listing.initialMaxPrice !== listing.currentPrice && (
+                  <Text style={styles.initialPrice}>
+                    Başlangıç: {formatPrice(listing.initialMaxPrice)} ₺
+                  </Text>
+                )}
+              </View>
+              
+              <View style={styles.bidInfoSection}>
+                <View style={styles.bidCountContainer}>
+                  <Text style={styles.bidCountLabel}>Teklifler</Text>
+                  <View style={styles.bidCountBadge}>
+                    <Text style={styles.bidCountNumber}>{listing.bids && listing.bids.length || 0}</Text>
+                  </View>
                 </View>
-              </View>
-              
-              <View style={styles.infoRow}>
-                <Chip icon="tag" style={styles.chip}>
-                  {typeof listing.category === 'object' 
-                    ? listing.category.name 
-                    : 'Kategori'}
-                </Chip>
-              <Chip 
-                  icon="calendar" 
-                  style={styles.chip}
-              >
-                  {listing.createdAt ? safeFormatDate(listing.createdAt) : 'Belirtilmemiş'}
-              </Chip>
-                <Chip 
-                  icon="clock-outline" 
-                  style={styles.chip}
-                  textStyle={{ color: isExpired() ? '#EF4444' : '#4B5563' }}
-                >
-                  {isExpired() 
-                    ? 'Süresi Doldu' 
-                    : listing.expiresAt 
-                      ? safeFormatDistanceToNow(listing.expiresAt) 
-                      : 'Belirtilmemiş'
-                  }
-              </Chip>
-            </View>
-              
-              {listing.description && (
-                <Paragraph style={styles.description}>
-                  {listing.description}
-                </Paragraph>
-              )}
-            
-            <Divider style={styles.divider} />
-            
-              <View style={styles.priceContainer}>
-                <Text style={styles.priceLabel}>Mevcut Fiyat:</Text>
-                <Text style={styles.price}>{listing.currentPrice} TL</Text>
-              </View>
-              
-              <View style={styles.priceContainer}>
-                <Text style={styles.priceLabel}>Başlangıç Fiyatı:</Text>
-                <Text style={styles.initialPrice}>{listing.initialMaxPrice} TL</Text>
+                
+                <View style={styles.statusContainer}>
+                  <Text style={styles.statusLabel}>Durum</Text>
+                  <Chip 
+                    mode="outlined" 
+                    style={[styles.statusChip, { 
+                      borderColor: listing.status === 'active' ? '#10B981' : 
+                                 listing.status === 'completed' ? '#3B82F6' : 
+                                 listing.status === 'cancelled' ? '#EF4444' : '#F59E0B'
+                    }]}
+                    textStyle={{ color: listing.status === 'active' ? '#10B981' : 
+                                       listing.status === 'completed' ? '#3B82F6' : 
+                                       listing.status === 'cancelled' ? '#EF4444' : '#F59E0B' }}
+                  >
+                    {listing.status === 'active' ? 'Aktif' :
+                     listing.status === 'completed' ? 'Tamamlandı' :
+                     listing.status === 'cancelled' ? 'İptal Edildi' : 'Süresi Doldu'}
+                  </Chip>
+                </View>
               </View>
               
               {!isOwner() && listing.status === 'active' && !isExpired() && (
                 <Button 
                   mode="contained" 
-                  icon="cash" 
+                  icon="cash-multiple" 
                   onPress={openBidDialog}
-                  style={styles.bidButton}
+                  style={styles.bidButtonNew}
+                  labelStyle={styles.bidButtonLabel}
                 >
                   Teklif Ver
                 </Button>
               )}
+            </Card.Content>
+          </Card>
+          
+          {/* Açıklama */}
+          <Card style={styles.card}>
+            <Card.Content>
+              <Title style={styles.sectionTitle}>Açıklama</Title>
+              <Paragraph style={styles.description}>
+                {listing.description}
+              </Paragraph>
+              
+              <View style={styles.metaInfo}>
+                <View style={styles.metaItem}>
+                  <Ionicons name="calendar-outline" size={16} color="#6B7280" style={styles.metaIcon} />
+                  <Text style={styles.metaText}>
+                    Eklenme: {listing.createdAt ? safeFormatDate(listing.createdAt) : 'Belirtilmemiş'}
+                  </Text>
+                </View>
+                
+                {(listing as any).location && (
+                  <View style={styles.metaItem}>
+                    <Ionicons name="location-outline" size={16} color="#6B7280" style={styles.metaIcon} />
+                    <Text style={styles.metaText}>{(listing as any).location}</Text>
+                  </View>
+                )}
+              </View>
             </Card.Content>
           </Card>
           
@@ -758,17 +899,8 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
             <Card.Content>
               <Title style={styles.sectionTitle}>Ürün Listesi</Title>
               
-              {/* Debug bilgisi */}
-              <View style={styles.debugContainer}>
-                <Text style={styles.debugText}>
-                  Items tipi: {typeof listing.items} | 
-                  Array mi?: {Array.isArray(listing.items) ? 'Evet' : 'Hayır'} | 
-                  Uzunluk: {Array.isArray(listing.items) ? listing.items.length : 'Bilinmiyor'}
-                </Text>
-              </View>
-              
               {Array.isArray(listing.items) && listing.items.length > 0 ? (
-                <View>
+                <View style={styles.itemsContainer}>
                   {listing.items.map((item, index) => (
                     <Surface key={`item-${index}`} style={styles.itemCard}>
                       <View style={styles.itemHeader}>
@@ -810,209 +942,177 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
             </Card.Content>
           </Card>
           
-          {/* Teklifler Listesi */}
+          {/* Teklifler Listesi - Modern Tasarım */}
           <Card style={styles.card}>
             <Card.Content>
-              <View style={styles.headerRow}>
+              <View style={styles.sectionTitleContainer}>
                 <Title style={styles.sectionTitle}>Teklifler</Title>
-                <Chip icon="gavel">{listing.bids && listing.bids.length || 0} Teklif</Chip>
+                <Chip icon="gavel" style={styles.bidCountChip}>{listing.bids && listing.bids.length || 0}</Chip>
               </View>
               
-              {!listing.bids || listing.bids.length === 0 ? (
-                <View style={styles.emptyState}>
-                  <Caption>Henüz teklif bulunmamaktadır</Caption>
-                </View>
-              ) : (
-                listing.bids.map((bid) => {
-                  const bidder = typeof bid.bidder === 'object' ? bid.bidder : null;
-                  const isListingOwner = isOwner();
-                  const bidderVisibility = getBidderVisibility(bid);
-                  const isAccepted = bid.status === 'accepted' || bid.isApproved === true;
-                  
-                  return (
-                    <TouchableOpacity 
-                      key={bid._id}
-                      onPress={() => isListingOwner && isAccepted ? showBidderDetails(bid) : null}
-                      disabled={!isListingOwner || !isAccepted}
-                      style={{ opacity: (!isListingOwner || !isAccepted) ? 0.9 : 1 }}
-                    >
-                      <Surface style={styles.bidCard}>
-                        <View style={styles.bidHeader}>
-                          <View style={styles.bidderInfo}>
+              {listing.bids && listing.bids.length > 0 ? (
+                <View style={styles.bidsContainer}>
+                  {listing.bids.map((bid, index) => {
+                    // Teklif veren bilgisini güvenli şekilde alma
+                    const bidder = typeof bid.bidder === 'object' ? bid.bidder : 
+                                (typeof bid.user === 'object' ? bid.user : null);
+                    
+                    // Teklif tutarını güvenli şekilde alma
+                    const amount = bid.price !== undefined ? bid.price : 
+                                (bid.amount !== undefined ? bid.amount : 0);
+                    
+                    // Teklif kabul edilmiş mi?
+                    const isAccepted = bid.status === 'accepted' || bid.isApproved === true;
+                    
+                    return (
+                      <Surface key={bid._id || index} style={styles.bidCardNew}>
+                        <View style={styles.bidHeaderNew}>
+                          <View style={styles.bidderInfoNew}>
                             <Avatar.Text 
                               size={36} 
-                              label={bidder && bidderVisibility.showName ? bidder.name.charAt(0) : '?'} 
+                              label={bidder?.name?.charAt(0) || '?'} 
+                              style={styles.bidderAvatar}
                             />
                             <View style={styles.bidderDetails}>
-                              <Text style={styles.bidderName}>
-                                {bidder 
-                                  ? (bidderVisibility.showName 
-                                    ? bidder.name 
-                                    : 'Anonim Teklif Veren') 
-                                  : 'Kullanıcı'}
+                              <Text style={styles.bidderNameNew}>
+                                {bidder?.name || 'İsimsiz Kullanıcı'}
                               </Text>
-                              <Text style={styles.bidTime}>
-                                {safeFormatDate(bid.createdAt)}
+                              <Text style={styles.bidTimeNew}>
+                                {bid.createdAt ? safeFormatDate(bid.createdAt) : 'Belirtilmemiş'}
                               </Text>
                             </View>
-              </View>
-              
-                          <View style={styles.bidAmount}>
-                            <Text style={styles.bidPrice}>{bid.price} TL</Text>
+                          </View>
+                          
+                          <View style={styles.bidAmountNew}>
+                            <Text style={styles.bidPriceNew}>{formatPrice(amount)} ₺</Text>
                             <Chip 
                               style={[
-                                styles.statusChip, 
-                                { backgroundColor: getBidStatusColor(bid.status, safeIsPast(bid.expiresAt)) }
+                                styles.statusChipBid, 
+                                { backgroundColor: getBidStatusColor(bid.status, isExpired()) }
                               ]}
-                              textStyle={{ color: '#FFFFFF' }}
+                              textStyle={{ color: '#FFFFFF', fontSize: 10 }}
                             >
-                              {getBidStatusText(bid.status, safeIsPast(bid.expiresAt))}
+                              {getBidStatusText(bid.status, isExpired())}
                             </Chip>
-              </View>
-            </View>
-            
-                        {/* Teklif sahibinin detaylı bilgileri - sadece ilan sahibi ve onaylanan teklifler için */}
-                        {bidderVisibility.showDetails && bidder && (
-                          <View style={styles.bidderDetailedInfo}>
-            <Divider style={styles.divider} />
-                            <Text style={styles.bidderDetailTitle}>Teklif Sahibi Bilgileri:</Text>
-                            
-                            {bidder.email && (
-                              <View style={styles.bidderDetailRow}>
-                                <Text style={styles.bidderDetailLabel}>E-posta:</Text>
-                                <Text style={styles.bidderDetailValue}>{bidder.email}</Text>
-                              </View>
-                            )}
-                            
-                            {bidder.phone && (
-                              <View style={styles.bidderDetailRow}>
-                                <Text style={styles.bidderDetailLabel}>Telefon:</Text>
-                                <Text style={styles.bidderDetailValue}>{bidder.phone}</Text>
-                              </View>
-                            )}
-                            
-                            {bidder.address && (
-                              <View style={styles.bidderDetailRow}>
-                                <Text style={styles.bidderDetailLabel}>Adres:</Text>
-                                <Text style={styles.bidderDetailValue}>{bidder.address}</Text>
-                              </View>
-                            )}
                           </View>
-                        )}
+                        </View>
                         
-                        {(bid.status === 'pending' && !safeIsPast(bid.expiresAt)) && isListingOwner && (
-                          <View style={styles.bidActions}>
+                        {/* İlan sahibiyse ve teklif beklemede ise veya kabul edilmişse göster */}
+                        <View style={styles.bidActions}>
+                          {isOwner() && bid.status === 'pending' && !isExpired() && (
+                            <>
+                              <Button 
+                                mode="outlined" 
+                                onPress={() => handleRejectBid(bid._id)} 
+                                style={[styles.actionButton, styles.rejectButton]}
+                                labelStyle={styles.rejectButtonLabel}
+                              >
+                                Reddet
+                              </Button>
+                              <Button 
+                                mode="contained" 
+                                onPress={() => handleAcceptBid(bid._id)} 
+                                style={[styles.actionButton, styles.acceptButton]}
+                                labelStyle={styles.acceptButtonLabel}
+                              >
+                                Kabul Et
+                              </Button>
+                            </>
+                          )}
+                          
+                          {/* Kabul edilen tekliflerin detaylarını görüntüleme butonu */}
+                          {(isOwner() && isAccepted) && (
                             <Button 
                               mode="outlined" 
-                              onPress={() => handleRejectBid(bid._id)}
-                              style={[styles.actionButton, styles.rejectButton]}
+                              onPress={() => showBidderDetails(bid)}
+                              style={{ marginTop: 8 }}
+                              icon="account-details"
                             >
-                              Reddet
+                              İletişim Bilgilerini Göster
                             </Button>
-                            <Button 
-                              mode="contained" 
-                              onPress={() => handleAcceptBid(bid._id)}
-                              style={[styles.actionButton, styles.acceptButton]}
-                            >
-                              Kabul Et
-                            </Button>
-                    </View>
-                        )}
-                        
-                        {(bid.status === 'pending' && !safeIsPast(bid.expiresAt)) && (
-                          <Text style={styles.expiryInfo}>
-                            {safeIsPast(bid.expiresAt)
-                              ? 'Teklif süresi doldu' 
-                              : `Teklif süresi: ${safeFormatDate(bid.expiresAt)}`}
-                          </Text>
-                        )}
-                        
-                        {isAccepted && isListingOwner && (
-                          <Text style={styles.tapForDetails}>
-                            Detaylar için tıklayın
-                          </Text>
-                        )}
+                          )}
+                        </View>
                       </Surface>
-                    </TouchableOpacity>
-                  );
-                })
-            )}
-          </Card.Content>
-        </Card>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="cash-outline" size={40} color="#9CA3AF" />
+                  <Text style={styles.emptyStateText}>
+                    Henüz teklif verilmemiş
+                  </Text>
+                  <Caption style={styles.emptyStateCaption}>
+                    İlk teklifi veren siz olun!
+                  </Caption>
+                </View>
+              )}
+            </Card.Content>
+          </Card>
         
-          {/* Satıcı Bilgileri */}
+          {/* Satıcı Bilgileri - Modern Kart */}
           <Card style={styles.card}>
             <Card.Content>
               <Title style={styles.sectionTitle}>Satıcı Bilgileri</Title>
               
-              <View style={styles.sellerInfo}>
-                <Avatar.Text 
-                  size={50} 
-                  label={
-                    typeof listing.owner === 'object' 
-                      ? listing.owner.name.charAt(0) 
-                      : '?'
-                  } 
-                />
+              <View style={styles.sellerInfoNew}>
+                <View style={styles.sellerAvatarContainer}>
+                  <Avatar.Text 
+                    size={60} 
+                    label={
+                      typeof listing.owner === 'object' 
+                        ? listing.owner.name.charAt(0) 
+                        : '?'
+                    } 
+                    style={styles.sellerAvatar}
+                  />
+                </View>
                 
-                <View style={styles.sellerDetails}>
-                  <Text style={styles.sellerName}>
+                <View style={styles.sellerDetailsNew}>
+                  <Text style={styles.sellerNameNew}>
                     {typeof listing.owner === 'object' 
                       ? listing.owner.name 
                       : 'Satıcı'}
                   </Text>
                   
                   {typeof listing.owner === 'object' && listing.owner.companyInfo?.companyName && (
-                    <Text style={styles.companyName}>
+                    <Text style={styles.companyNameNew}>
                       {listing.owner.companyInfo.companyName}
                     </Text>
                   )}
                   
-                  <Text style={styles.memberSince}>
+                  <Text style={styles.memberSinceNew}>
                     Kayıt Tarihi: {
                       typeof listing.owner === 'object' && listing.owner.createdAt
                         ? safeFormatDate(listing.owner.createdAt)
                         : 'Belirtilmemiş'
                     }
-              </Text>
+                  </Text>
+                  
+                  <View style={styles.sellerContactButtons}>
+                    {typeof listing.owner === 'object' && listing.owner.email && (
+                      <Button 
+                        mode="outlined" 
+                        icon="email-outline"
+                        style={styles.contactButton}
+                        onPress={() => Linking.openURL(`mailto:${listing.owner.email}`)}
+                      >
+                        E-posta
+                      </Button>
+                    )}
+                    
+                    {typeof listing.owner === 'object' && listing.owner.phone && (
+                      <Button 
+                        mode="outlined" 
+                        icon="phone-outline"
+                        style={styles.contactButton}
+                        onPress={() => Linking.openURL(`tel:${listing.owner.phone}`)}
+                      >
+                        Ara
+                      </Button>
+                    )}
+                  </View>
                 </View>
-              </View>
-            </Card.Content>
-          </Card>
-        
-          {/* İlan İçeriği */}
-          <Card style={styles.card}>
-            <Card.Content>
-              <Title style={styles.sectionTitle}>İlan İçeriği</Title>
-              
-              <View style={styles.contentContainer}>
-                {/* İlan Miktar ve Birim Bilgileri */}
-                {(listing as any).quantity !== undefined && (
-                  <View style={styles.contentRow}>
-                    <Text style={styles.contentLabel}>Toplam Miktar:</Text>
-                    <Text style={styles.contentValue}>
-                      {(listing as any).quantity || 0} {(listing as any).unit || 'Adet'}
-                    </Text>
-                  </View>
-                )}
-                
-                {/* Konum Bilgisi */}
-                {(listing as any).location && (
-                  <View style={styles.contentRow}>
-                    <Text style={styles.contentLabel}>Konum:</Text>
-                    <Text style={styles.contentValue}>{(listing as any).location}</Text>
-                  </View>
-                )}
-
-                {/* Açıklama */}
-                {listing.description && (
-                  <View style={styles.contentDescription}>
-                    <Text style={styles.contentLabel}>Detaylı Açıklama:</Text>
-                    <Paragraph style={styles.contentDescriptionText}>
-                      {listing.description}
-                    </Paragraph>
-                  </View>
-                )}
               </View>
             </Card.Content>
           </Card>
@@ -1024,46 +1124,69 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
         <Dialog
           visible={bidDialogVisible}
           onDismiss={() => setBidDialogVisible(false)}
+          style={{ borderRadius: 12 }}
         >
           <Dialog.Title>Teklif Ver</Dialog.Title>
           <Dialog.Content>
-            <Paragraph style={styles.bidNote}>
-              Bu bir ters açık artırmadır. Teklifiniz mevcut fiyattan düşük olmalıdır.
-            </Paragraph>
-            <Paragraph style={styles.bidNote}>
-              Mevcut Fiyat: {listing.currentPrice} TL
-            </Paragraph>
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontWeight: 'bold', marginBottom: 8 }}>Ters Açık Artırma Kuralları:</Text>
+              <Text style={{ fontSize: 14, marginBottom: 4, color: '#4B5563' }}>
+                • Teklifiniz, mevcut fiyattan daha düşük olmalıdır.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 4, color: '#4B5563' }}>
+                • Teklifiniz, mevcut fiyattan en az %5 daha düşük olmalıdır.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 4, color: '#4B5563' }}>
+                • En düşük teklif veren, ilan sahibi tarafından kabul edilme önceliğine sahiptir.
+              </Text>
+              <Text style={{ fontSize: 14, marginBottom: 4, color: '#4B5563' }}>
+                • Teklifinizin geçerlilik süresi 12 saattir.
+              </Text>
+            </View>
+            
+            {listing && (
+              <View style={{ backgroundColor: '#f0f9ff', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+                <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>Mevcut Fiyat: {listing.currentPrice.toFixed(2)} TL</Text>
+                <Text style={{ color: '#0369a1' }}>
+                  Kabul edilebilir maksimum teklif: {(listing.currentPrice * 0.95).toFixed(2)} TL
+                </Text>
+              </View>
+            )}
             
             <TextInput
               label="Teklif Tutarı (TL)"
               value={bidAmount}
               onChangeText={setBidAmount}
               keyboardType="numeric"
+              right={<TextInput.Affix text="TL" />}
+              style={{ marginBottom: 8 }}
               mode="outlined"
-              style={styles.bidInput}
-              maxFontSizeMultiplier={1}
-              autoComplete="off"
-              autoCorrect={false}
-              dense={true}
-              textContentType="none"
-              spellCheck={false}
-              allowFontScaling={false}
+              disabled={submitting}
+              error={bidAmount !== '' && (isNaN(Number(bidAmount)) || Number(bidAmount) <= 0)}
             />
-            
-            <Paragraph style={styles.bidWarning}>
-              Not: Teklifiniz 12 saat boyunca geçerli olacaktır. Bu süre içinde satıcı teklifinizi kabul edebilir veya reddedebilir.
-            </Paragraph>
-            
-            <Paragraph style={styles.bidWarning}>
-              Önemli: Yeni bir teklif verdiğinizde, sizden daha yüksek fiyat teklifi verenler otomatik olarak reddedilecek, diğer tüm tekliflerin onay durumları sıfırlanacaktır. Satıcı sadece en düşük fiyat teklifini kabul edebilir.
-            </Paragraph>
+            {bidAmount !== '' && (isNaN(Number(bidAmount)) || Number(bidAmount) <= 0) && (
+              <Text style={{ color: '#EF4444', fontSize: 12, marginBottom: 8 }}>
+                Lütfen geçerli bir tutar giriniz
+              </Text>
+            )}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setBidDialogVisible(false)}>İptal</Button>
+            <Button onPress={() => setBidDialogVisible(false)} disabled={submitting}>
+              İptal
+            </Button>
             <Button 
+              mode="contained" 
               onPress={handleBid} 
               loading={submitting}
-              disabled={submitting}
+              disabled={
+                submitting || 
+                bidAmount === '' || 
+                isNaN(Number(bidAmount)) || 
+                Number(bidAmount) <= 0 ||
+                !listing ||
+                Number(bidAmount) >= listing.currentPrice ||
+                Number(bidAmount) > listing.currentPrice * 0.95
+              }
             >
               Teklif Ver
             </Button>
@@ -1071,24 +1194,27 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
         </Dialog>
       </Portal>
       
-      {/* Teklif Veren Kullanıcı Detay Dialog - Tamamen yenilenmiş */}
+      {/* Teklif Veren Detayları Dialog */}
       <Portal>
         <Dialog
           visible={bidderDetailsVisible}
           onDismiss={() => setBidderDetailsVisible(false)}
-          style={{ maxWidth: '90%', borderRadius: 12 }}
+          style={{ borderRadius: 12, maxWidth: '90%' }}
         >
-          <Dialog.Title>Teklif Sahibi Bilgileri</Dialog.Title>
-          <BidderDetailDialog 
-            selectedBid={selectedBid} 
-            onRefresh={onRefresh} 
+          <Dialog.Title>Teklif Veren Bilgileri</Dialog.Title>
+          <BidderDetailDialog
+            selectedBid={selectedBid}
+            onRefresh={onRefresh}
             onClose={() => setBidderDetailsVisible(false)}
             getBidStatusColor={getBidStatusColor}
             getBidStatusText={getBidStatusText}
             safeFormatDate={safeFormatDate}
+            isOwner={isOwner()}
           />
           <Dialog.Actions>
-            <Button onPress={() => setBidderDetailsVisible(false)}>Kapat</Button>
+            <Button onPress={() => setBidderDetailsVisible(false)}>
+              Kapat
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

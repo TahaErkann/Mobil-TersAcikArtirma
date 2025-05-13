@@ -1,159 +1,112 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAuth } from '../hooks/useAuth';
-import api from '../services/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { STORAGE_KEYS } from '../types';
+import Toast from 'react-native-toast-message';
 
-// API URLs - api.ts dosyasındakiyle aynı olmalı
-const API_URLS = {
-  ANDROID_EMULATOR: 'http://10.0.2.2:5001',
-  IOS_SIMULATOR: 'http://localhost:5001',
-  DEVELOPMENT: 'http://192.168.254.112:5001',
-  TEST: 'http://192.168.254.112:5001',
-};
+// Sabit olarak cihazlarda çalışacak IP adresi
+const SOCKET_URL = 'http://192.168.254.112:5001';
 
-// Aktif API URL - kendi sunucunuza göre ayarlayın
-const ACTIVE_API_URL = API_URLS.TEST;
-
-// Socket Context tipleri
 interface SocketContextType {
   socket: Socket | null;
-  isConnected: boolean;
+  connected: boolean;
+  on: (event: string, callback: (data: any) => void) => void;
+  off: (event: string, callback: (data: any) => void) => void;
+  emit: (event: string, data: any) => void;
 }
 
-// Context'i oluştur
-export const SocketContext = createContext<SocketContextType>({
-  socket: null,
-  isConnected: false,
-});
+const SocketContext = createContext<SocketContextType | null>(null);
 
-// Hook
 export const useSocket = () => {
   const context = useContext(SocketContext);
   if (!context) {
     throw new Error('useSocket must be used within a SocketProvider');
   }
-  
-  // Geriye dönük uyumluluk için on, off, emit metodlarını ekle
-  const on = (event: string, callback: (data: any) => void) => {
-    if (context.socket) {
-      context.socket.on(event, callback);
-    } else {
-      console.warn(`Socket bağlantısı olmadan "${event}" olayı dinlenemedi.`);
-    }
-  };
-  
-  const off = (event: string, callback: (data: any) => void) => {
-    if (context.socket) {
-      context.socket.off(event, callback);
-    } else {
-      console.warn(`Socket bağlantısı olmadan "${event}" olayı durdurulamadı.`);
-    }
-  };
-  
-  const emit = (event: string, data: any) => {
-    if (context.socket) {
-      context.socket.emit(event, data);
-    } else {
-      console.warn(`Socket bağlantısı olmadan "${event}" olayı gönderilemedi.`);
-    }
-  };
-  
-  // Hem eski hem yeni arayüzü dön
-  return {
-    ...context,
-    on,
-    off,
-    emit,
-    connected: context.isConnected
-  };
+  return context;
 };
 
-// Provider
-interface SocketProviderProps {
-  children: React.ReactNode;
-}
-
-export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
+export const SocketProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const { isAuthenticated, user } = useAuth();
+  const [connected, setConnected] = useState(false);
+  const { user, token } = useAuth();
 
   useEffect(() => {
     let socketInstance: Socket | null = null;
 
-    const connectSocket = () => {
-      if (isAuthenticated && user) {
-        try {
-          // Socket.io bağlantısını ana URL'e yap, namespace kullanma
-          socketInstance = io(ACTIVE_API_URL, {
-            reconnectionAttempts: 5,
-            reconnectionDelay: 5000,
-            // Namespace yerine auth parametresi ile yetkilendirme
-            auth: {
-              userId: user._id
-            },
-            // Otomatik yeniden bağlanma
-            reconnection: true,
-            // Bağlantı zaman aşımı (30 saniye)
-            timeout: 30000,
-          });
+    if (user && token) {
+      try {
+        console.log('Socket.io bağlantısı kuruluyor:', SOCKET_URL);
+        
+        socketInstance = io(SOCKET_URL, {
+          transports: ['websocket', 'polling'],
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          auth: {
+            token: token
+          }
+        });
 
-          socketInstance.on('connect', () => {
-            console.log('Socket.io bağlantısı kuruldu');
-            setIsConnected(true);
-          });
+        socketInstance.on('connect', () => {
+          console.log('Socket.io bağlantısı kuruldu');
+          setConnected(true);
+        });
 
-          socketInstance.on('disconnect', (reason) => {
-            console.log(`Socket.io bağlantısı kapandı: ${reason}`);
-            setIsConnected(false);
-          });
+        socketInstance.on('disconnect', (reason) => {
+          console.log('Socket.io bağlantısı kesildi:', reason);
+          setConnected(false);
+        });
 
-          socketInstance.on('connect_error', (error) => {
-            console.error('Socket.io bağlantı hatası:', error.message);
-            // Bağlantı hataları yok sayılabilir, uygulama çalışmaya devam edebilir
-            setIsConnected(false);
+        socketInstance.on('connect_error', (error) => {
+          console.error('Socket.io bağlantı hatası:', error);
+          Toast.show({
+            type: 'error',
+            text1: 'Bağlantı Hatası',
+            text2: 'Gerçek zamanlı güncellemeler alınamıyor.'
           });
+          setConnected(false);
+        });
 
-          socketInstance.on('error', (error) => {
-            console.error('Socket.io hatası:', error);
-            setIsConnected(false);
-          });
-
-          setSocket(socketInstance);
-        } catch (error) {
-          console.error('Socket.io başlatma hatası:', error);
-          setIsConnected(false);
-        }
-      } else {
-        // Kullanıcı giriş yapmamışsa, socket bağlantısını kapat
-        if (socketInstance) {
-          console.log('Socket bağlantısı kapatılıyor (kullanıcı oturumu kapalı)');
-          socketInstance.disconnect();
-          socketInstance = null;
-          setSocket(null);
-          setIsConnected(false);
-        }
+        setSocket(socketInstance);
+      } catch (error) {
+        console.error("Socket bağlantısı oluşturulamadı:", error);
+        Toast.show({
+          type: 'error',
+          text1: 'Bağlantı Hatası',
+          text2: 'Gerçek zamanlı bağlantı kurulamadı.'
+        });
       }
-    };
+    }
 
-    connectSocket();
-
-    // Temizleme işlevi
     return () => {
       if (socketInstance) {
-        console.log('SocketProvider temizleniyor');
         socketInstance.disconnect();
-        socketInstance = null;
         setSocket(null);
-        setIsConnected(false);
+        setConnected(false);
       }
     };
-  }, [isAuthenticated, user]);
+  }, [user, token]);
+
+  const on = (event: string, callback: (data: any) => void) => {
+    if (socket) {
+      socket.on(event, callback);
+    }
+  };
+
+  const off = (event: string, callback: (data: any) => void) => {
+    if (socket) {
+      socket.off(event, callback);
+    }
+  };
+
+  const emit = (event: string, data: any) => {
+    if (socket && connected) {
+      socket.emit(event, data);
+    } else {
+      console.warn(`Socket bağlantısı olmadan "${event}" olayı tetiklenemedi.`);
+    }
+  };
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected }}>
+    <SocketContext.Provider value={{ socket, connected, on, off, emit }}>
       {children}
     </SocketContext.Provider>
   );

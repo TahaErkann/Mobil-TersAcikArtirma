@@ -12,8 +12,12 @@ export interface User {
     city?: string;
     phone?: string;
     taxNumber?: string;
+    taxOffice?: string; // Vergi dairesi
     description?: string;
   };
+  birthDate?: string; // Doğum tarihi
+  gender?: string; // Cinsiyet
+  nationalId?: string; // T.C. Kimlik No
   isAdmin: boolean;
   isApproved: boolean;
   isRejected: boolean;
@@ -54,6 +58,7 @@ export interface Bid {
   timestamp?: string; // createdAt ile aynı, geriye dönük uyumluluk için
   createdAt: string;
   updatedAt?: string;
+  acceptedAt?: string; // Teklifin kabul edildiği tarih
 }
 
 // İlan
@@ -115,6 +120,15 @@ export const STORAGE_KEYS = {
   TOKEN: 'token',
   USER: 'user'
 };
+
+// Socket Context
+export interface SocketContextType {
+  socket: any | null;
+  connected: boolean;
+  on: (event: string, callback: (...args: any[]) => void) => void;
+  off: (event: string, callback: (...args: any[]) => void) => void;
+  emit: (event: string, data: any) => void;
+}
 
 // Stats - İstatistik verileri
 export interface Stats {

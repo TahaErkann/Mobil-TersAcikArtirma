@@ -1,198 +1,392 @@
 import { StyleSheet } from 'react-native';
 
+// İlan detay sayfası için modern ve şık stiller
 export const listingDetailStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#F5F7FA',
   },
+  // Appbar ve Header Stiller
+  appbar: {
+    backgroundColor: 'transparent',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 0,
+  },
+  hero: {
+    height: 280,
+    width: '100%',
+  },
+  heroGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '70%',
+    justifyContent: 'flex-end',
+    paddingBottom: 16,
+  },
+  heroContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  heroMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  heroTitle: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  categoryChipHero: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 8,
+  },
+  categoryChipTextHero: {
+    color: '#4F46E5',
+    fontWeight: 'bold',
+  },
+  timeChip: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 8,
+  },
+  
+  // Scroll View ve Container
   scrollView: {
-    flex: 1,
+    backgroundColor: '#F5F7FA',
   },
   detailContainer: {
     padding: 16,
+    paddingTop: 0,
   },
+  
+  // Kartlar İçin Genel Stiller
   card: {
     marginBottom: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     elevation: 2,
+    overflow: 'hidden',
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  cardPrimary: {
+    marginTop: -40,
+    marginBottom: 16,
+    borderRadius: 12,
+    elevation: 3,
+    backgroundColor: 'white',
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.23,
+    shadowRadius: 2.62,
+  },
+  
+  // Fiyat Kartı Stil
+  priceCardContent: {
+    padding: 16,
+  },
+  currentPriceSection: {
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
-  titleContainer: {
-    flex: 1,
+  priceHeading: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  badge: {
-    alignSelf: 'flex-start',
-    marginBottom: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
-  chip: {
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  description: {
-    marginTop: 8,
-    marginBottom: 8,
-    color: '#4B5563',
-  },
-  divider: {
-    marginVertical: 12,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  priceLabel: {
-    fontSize: 16,
-    color: '#4B5563',
-  },
-  price: {
-    fontSize: 20,
+  currentPrice: {
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#10B981',
+    marginBottom: 4,
   },
   initialPrice: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#9CA3AF',
     textDecorationLine: 'line-through',
   },
-  bidButton: {
-    marginTop: 16,
+  bidInfoSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 16,
   },
+  bidCountContainer: {
+    alignItems: 'center',
+  },
+  bidCountLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  bidCountBadge: {
+    backgroundColor: '#4F46E5',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bidCountNumber: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  statusContainer: {
+    alignItems: 'center',
+  },
+  statusLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  statusChip: {
+    height: 28,
+  },
+  bidButtonNew: {
+    marginTop: 8,
+    backgroundColor: '#4F46E5',
+    borderRadius: 8,
+    padding: 4,
+  },
+  bidButtonLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  
+  // Bölüm Başlıkları
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
+    color: '#1F2937',
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  bidCountChip: {
+    backgroundColor: '#EEF2FF',
+  },
+  
+  // Açıklama Bölümü
+  description: {
+    fontSize: 15,
+    color: '#4B5563',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  metaInfo: {
+    marginTop: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    padding: 12,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  metaIcon: {
+    marginRight: 8,
+  },
+  metaText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  
+  // Ürünler Listesi
+  itemsContainer: {
+    marginTop: 8,
   },
   itemCard: {
+    marginBottom: 12,
     padding: 12,
-    marginBottom: 8,
     borderRadius: 8,
+    backgroundColor: '#F9FAFB',
     elevation: 1,
   },
   itemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   itemName: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#1F2937',
+    flex: 1,
   },
   quantityChip: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#EEF2FF',
   },
   itemDescription: {
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#4B5563',
   },
-  bidCard: {
-    padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    elevation: 1,
+  
+  // Teklifler Bölümü
+  bidsContainer: {
+    marginTop: 8,
   },
-  bidHeader: {
+  bidCardNew: {
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    elevation: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  bidHeaderNew: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  bidderInfo: {
+  bidderInfoNew: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  bidderAvatar: {
+    backgroundColor: '#4F46E5',
+  },
   bidderDetails: {
-    marginLeft: 8,
+    marginLeft: 12,
   },
-  bidderName: {
-    fontSize: 14,
+  bidderNameNew: {
+    fontSize: 15,
     fontWeight: 'bold',
+    color: '#1F2937',
   },
-  bidTime: {
+  bidTimeNew: {
     fontSize: 12,
     color: '#6B7280',
   },
-  bidAmount: {
+  bidAmountNew: {
     alignItems: 'flex-end',
   },
-  bidPrice: {
-    fontSize: 16,
+  bidPriceNew: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#10B981',
     marginBottom: 4,
   },
-  statusChip: {
+  statusChipBid: {
     height: 24,
   },
+  
+  // Teklif Kabul/Red Butonları
   bidActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   actionButton: {
-    minWidth: 100,
     marginLeft: 8,
-  },
-  acceptButton: {
-    backgroundColor: '#10B981',
+    minWidth: 100,
   },
   rejectButton: {
     borderColor: '#EF4444',
   },
-  expiryInfo: {
-    marginTop: 8,
-    fontSize: 12,
-    color: '#6B7280',
-    fontStyle: 'italic',
+  rejectButtonLabel: {
+    color: '#EF4444',
   },
-  sellerInfo: {
+  acceptButton: {
+    backgroundColor: '#10B981',
+  },
+  acceptButtonLabel: {
+    color: '#FFFFFF',
+  },
+  
+  // Satıcı Bilgileri
+  sellerInfoNew: {
     flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
   },
-  sellerDetails: {
-    marginLeft: 12,
+  sellerAvatarContainer: {
+    marginRight: 16,
   },
-  sellerName: {
-    fontSize: 16,
+  sellerAvatar: {
+    backgroundColor: '#4F46E5',
+  },
+  sellerDetailsNew: {
+    flex: 1,
+  },
+  sellerNameNew: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 4,
   },
-  companyName: {
-    fontSize: 14,
+  companyNameNew: {
+    fontSize: 15,
     color: '#4B5563',
+    marginBottom: 8,
   },
-  memberSince: {
-    fontSize: 12,
+  memberSinceNew: {
+    fontSize: 13,
     color: '#6B7280',
-    marginTop: 4,
+    marginBottom: 12,
   },
+  sellerContactButtons: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  contactButton: {
+    marginRight: 8,
+    borderColor: '#4F46E5',
+  },
+  
+  // Boş Durum
   emptyState: {
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
+    marginVertical: 8,
   },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  emptyStateCaption: {
+    color: '#9CA3AF',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  
+  // Yükleme ve Hata Durumları
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F5F7FA',
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 16,
     fontSize: 16,
     color: '#6B7280',
   },
@@ -200,113 +394,32 @@ export const listingDetailStyles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    backgroundColor: '#F5F7FA',
+    padding: 24,
   },
   errorText: {
-    marginVertical: 16,
     fontSize: 16,
-    color: '#4B5563',
+    color: '#6B7280',
     textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 24,
   },
   retryButton: {
-    marginTop: 16,
+    backgroundColor: '#4F46E5',
   },
-  bidNote: {
-    marginBottom: 12,
-  },
-  bidInput: {
+  
+  // Diğer Stiller
+  divider: {
     marginVertical: 12,
   },
-  bidWarning: {
-    marginTop: 12,
-    fontSize: 12,
-    color: '#EF4444',
-    fontStyle: 'italic',
-  },
-  contentContainer: {
-    padding: 12,
-  },
-  contentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  contentLabel: {
-    fontSize: 16,
-    color: '#4B5563',
-  },
-  contentValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#10B981',
-  },
-  contentDescription: {
-    marginTop: 12,
-  },
-  contentDescriptionText: {
-    color: '#6B7280',
-  },
-  debugContainer: {
-    padding: 8,
-    backgroundColor: '#ffeeee',
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  debugText: {
-    fontSize: 10,
-    color: '#999',
-  },
-  emptyStateCaption: {
-    marginTop: 12,
-    fontSize: 12,
-    color: '#6B7280',
-    textAlign: 'center',
-  },
-  bidderDetailedInfo: {
-    marginTop: 12,
-    paddingTop: 8,
-  },
-  bidderDetailTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  bidderDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  bidderDetailLabel: {
-    width: 80,
-    fontSize: 14,
-    color: '#6B7280',
-  },
-  bidderDetailValue: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  tapForDetails: {
-    textAlign: 'center',
-    fontSize: 12,
-    color: '#4F46E5',
-    marginTop: 8,
-  },
-  bidderDetailDialog: {
-    maxWidth: '90%',
-    borderRadius: 12,
-  },
-  bidderDetailScrollView: {
-    maxHeight: 400,
-  },
+  // BidderDetailDialog için stil tanımlamaları
   bidderInfoDialog: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   bidderNameContainer: {
-    marginLeft: 16,
+    marginLeft: 12,
     flex: 1,
   },
   bidderNameDialog: {
@@ -314,10 +427,4 @@ export const listingDetailStyles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 4,
   },
-  debugInfo: {
-    padding: 8,
-    backgroundColor: '#eeeeff',
-    borderRadius: 4,
-    marginBottom: 8,
-  }
 }); 

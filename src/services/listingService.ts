@@ -1,4 +1,4 @@
-import api from './api';
+import api, { apiRequest } from './api';
 import { Listing, ApiResponse, Bid, ListingItem } from '../types';
 
 /**
@@ -6,8 +6,9 @@ import { Listing, ApiResponse, Bid, ListingItem } from '../types';
  */
 export const getAllListings = async (): Promise<Listing[]> => {
   try {
-    const response = await api.get('/listings');
-    return response.data;
+    // Direkt API istek fonksiyonunu kullan
+    const data = await apiRequest<Listing[]>('get', '/listings');
+    return data;
   } catch (error) {
     console.error('İlan listeleme hatası:', error);
     throw new Error('İlanlar yüklenirken bir hata oluştu');
@@ -19,8 +20,8 @@ export const getAllListings = async (): Promise<Listing[]> => {
  */
 export const getListingsByCategory = async (categoryId: string): Promise<Listing[]> => {
   try {
-    const response = await api.get(`/listings/category/${categoryId}`);
-    return response.data;
+    const data = await apiRequest<Listing[]>('get', `/listings/category/${categoryId}`);
+    return data;
   } catch (error) {
     console.error('Kategoriye göre ilan listeleme hatası:', error);
     throw new Error('İlanlar yüklenirken bir hata oluştu');

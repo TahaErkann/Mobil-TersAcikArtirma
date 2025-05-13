@@ -1,559 +1,673 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  FlatList, 
-  RefreshControl, 
-  TouchableOpacity,
-  ActivityIndicator 
-} from 'react-native';
-import { 
-  Appbar, 
-  FAB, 
-  Card, 
-  Title, 
-  Paragraph, 
-  Searchbar, 
-  Chip, 
-  Badge, 
-  Text,
-  Divider,
-  Button,
-  Portal,
-  Dialog,
-  Menu
-} from 'react-native-paper';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, StatusBar, Dimensions, ImageBackground } from 'react-native';
+import { Button, Card, Chip, Text, Title, useTheme, Avatar, ActivityIndicator, Surface } from 'react-native-paper';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../navigation/types';
-import { getAllListings, getListingsByCategory } from '../services/listingService';
-import { getAllCategories } from '../services/categoryService';
-import { Listing, Category } from '../types';
 import { useAuth } from '../hooks/useAuth';
-import { formatDistanceToNow, isPast } from 'date-fns';
-import { tr } from 'date-fns/locale';
+import { useSocket } from '../context/SocketContext';
+import { truncateText } from '../utils/stringUtils';
+import { formatRemainingTime } from '../utils/dateUtils';
+import { globalStyles, shadowProps } from '../components/theme';
+import Toast from 'react-native-toast-message';
+import { getAllListings } from '../services/listingService';
+import { getAllCategories } from '../services/categoryService';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Listing as ListingType } from '../types';
 
-type HomeScreenProps = {
-  navigation: StackNavigationProp<RootStackParamList, 'Home'>;
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = width * 0.85;
+
+// İonicons tip hatası önleme
+type IconName = 'search-outline' | 'flash-outline' | 'hammer-outline' | 'construct-outline' | 
+  'car-outline' | 'business-outline' | 'water-outline' | 'laptop-outline' | 
+  'desktop-outline' | 'restaurant-outline' | 'shirt-outline' | 'medkit-outline' | 'cube-outline' |
+  'document-outline';
+
+// Genişletilmiş İlan tipi, servislerden gelen tip ile uyumlu olması için
+type Listing = {
+  _id: string;
+  title: string;
+  description: string;
+  category: {
+    _id: string;
+    name: string;
+  };
+  currentPrice: number;
+  createdAt: string;
+  endTime?: string;
+  expiresAt?: string;
+  status?: string;
+  bids: Array<any>;
+  initialMaxPrice?: number;
 };
+
+type Category = {
+  _id: string;
+  name: string;
+  count?: number;
+  icon?: string;
+};
+
+interface HomeScreenProps {
+  navigation: NativeStackNavigationProp<any>;
+}
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
-  const [listings, setListings] = useState<Listing[]>([]);
-  const [filteredListings, setFilteredListings] = useState<Listing[]>([]);
+  const { colors } = useTheme();
+  const socket = useSocket();
+  
+  const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
+  const [latestListings, setLatestListings] = useState<Listing[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  
-  // Kategori dialog durumu
-  const [categoryDialogVisible, setCategoryDialogVisible] = useState(false);
-  
-  // Filtre menüsü durumu
-  const [filterMenuVisible, setFilterMenuVisible] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'price'>('all');
-  
-  // İlanları ve kategorileri yükle
-  const loadData = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      // Kategorileri yükle
-      const categoriesData = await getAllCategories();
-      setCategories(categoriesData.filter(c => c.isActive));
-      
-      // Filtrelenmiş ilanları veya tüm ilanları yükle
-      let listingsData: Listing[];
-      if (selectedCategory) {
-        listingsData = await getListingsByCategory(selectedCategory);
-      } else {
-        listingsData = await getAllListings();
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+    
+    const handleBidUpdate = (data: any) => {
+      // Teklif güncellemesi geldiğinde fiyatı güncelle
+      if (data && data.listing && data.bid) {
+        updateListingPrice(data.listing._id, data.bid.price || data.bid.amount);
       }
+    };
+    
+    if (socket && socket.connected) {
+      socket.on('bidUpdate', handleBidUpdate);
       
-      // Sadece onaylı ilanları göster
-      const approvedListings = listingsData.filter(listing => listing.isApproved);
+      return () => {
+        socket.off('bidUpdate', handleBidUpdate);
+      };
+    }
+  }, [socket?.connected]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      // Servisler üzerinden veri çekme
+      const [categoriesData, listingsData] = await Promise.all([
+        getAllCategories(),
+        getAllListings()
+      ]);
       
-      setListings(approvedListings);
-      applyFilters(approvedListings, searchQuery, activeFilter);
+      setCategories(categoriesData || []);
+      
+      if (listingsData && listingsData.length > 0) {
+        // Son eklenenlere göre sırala
+        const sortedListings = [...listingsData].sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        
+        // Öne çıkan ilanlar (aktif ve fiyatı en düşük 5 ilan)
+        const featured = [...listingsData]
+          .filter(listing => listing.status === 'active')
+          .sort((a, b) => a.currentPrice - b.currentPrice)
+          .slice(0, 5);
+        
+        // API'den gelen verileri Listing tipine dönüştür
+        const mappedFeatured = featured.map(item => {
+          return {
+            ...item,
+            category: typeof item.category === 'string' 
+              ? { _id: '', name: item.category } 
+              : item.category
+          } as Listing;
+        });
+        
+        const mappedLatest = sortedListings.slice(0, 10).map(item => {
+          return {
+            ...item,
+            category: typeof item.category === 'string' 
+              ? { _id: '', name: item.category } 
+              : item.category
+          } as Listing;
+        });
+        
+        setFeaturedListings(mappedFeatured);
+        setLatestListings(mappedLatest);
+      } else {
+        setFeaturedListings([]);
+        setLatestListings([]);
+      }
     } catch (error) {
-      console.error('Veri yükleme hatası:', error);
+      console.error('Veri yüklenirken hata oluştu:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Veri yüklenemedi',
+        text2: 'Lütfen internet bağlantınızı kontrol edin'
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedCategory, searchQuery, activeFilter]);
-  
-  // İlk yükleme
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-  
-  // Yenileme işlemi
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
-    loadData();
+    fetchData();
   };
-  
-  // Arama ve filtreleme işlemleri
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    applyFilters(listings, query, activeFilter);
-  };
-  
-  // Filtreleri uygula
-  const applyFilters = (listingsToFilter: Listing[], query: string, filter: string) => {
-    // Önce arama sorgusuna göre filtrele
-    let filtered = listingsToFilter.filter(listing => 
-      listing.title.toLowerCase().includes(query.toLowerCase()) ||
-      listing.description.toLowerCase().includes(query.toLowerCase())
+
+  const updateListingPrice = (listingId: string, newPrice: number) => {
+    // Öne çıkan ilanları güncelle
+    setFeaturedListings(prevListings => 
+      prevListings.map(listing => 
+        listing._id === listingId 
+          ? { ...listing, currentPrice: newPrice } 
+          : listing
+      )
     );
     
-    // Sonra seçilen filtreye göre filtrele ve sırala
-    switch (filter) {
-      case 'active':
-        filtered = filtered.filter(listing => listing.status === 'active' && !isPast(new Date(listing.expiresAt)));
-        break;
-      case 'price':
-        filtered.sort((a, b) => a.currentPrice - b.currentPrice);
-        break;
-    }
-    
-    setFilteredListings(filtered);
+    // En son ilanları güncelle
+    setLatestListings(prevListings => 
+      prevListings.map(listing => 
+        listing._id === listingId 
+          ? { ...listing, currentPrice: newPrice } 
+          : listing
+      )
+    );
   };
-  
-  // Kategori filtresi uygula
-  const applyCategoryFilter = (categoryId: string | null) => {
-    setSelectedCategory(categoryId);
-    setCategoryDialogVisible(false);
-  };
-  
-  // İlan durumuna göre etiket oluştur
-  const getStatusBadge = (listing: Listing) => {
-    const expiryDate = new Date(listing.expiresAt);
-    const isExpired = isPast(expiryDate);
-    
-    if (isExpired) {
-      return <Badge style={[styles.badge, styles.expiredBadge]}>Süresi Doldu</Badge>;
-    }
-    
-    switch (listing.status) {
-      case 'active':
-        return <Badge style={[styles.badge, styles.activeBadge]}>Aktif</Badge>;
-      case 'completed':
-        return <Badge style={[styles.badge, styles.completedBadge]}>Tamamlandı</Badge>;
-      case 'cancelled':
-        return <Badge style={[styles.badge, styles.cancelledBadge]}>İptal Edildi</Badge>;
-      default:
-        return null;
-    }
-  };
-  
-  // Kategori başlığını getir
-  const getCategoryTitle = () => {
-    if (!selectedCategory) {
-      return 'Tüm İlanlar';
-    }
-    
-    const category = categories.find(c => c._id === selectedCategory);
-    return category ? category.name : 'Tüm İlanlar';
-  };
-  
-  // İlanı göster
-  const viewListing = (id: string) => {
+
+  const handleListingPress = (id: string) => {
     navigation.navigate('ListingDetail', { id });
   };
-  
-  // Yeni ilan oluşturma ekranına git
-  const createNewListing = () => {
+
+  const navigateToCreateListing = () => {
     navigation.navigate('CreateListing');
   };
-  
-  // İçerik yükleniyor
+
+  const navigateToCategory = (categoryId: string, categoryName: string) => {
+    navigation.navigate('Kategoriler', { screen: 'Listing', params: { categoryId, categoryName } });
+  };
+
+  const navigateToAllListings = (categoryId?: string) => {
+    navigation.navigate('AllListings', { categoryId });
+  };
+
+  const getCategoryIconName = (categoryName: string): IconName => {
+    const categoryMap: Record<string, IconName> = {
+      'Elektrik': 'flash-outline',
+      'Hırdavat': 'hammer-outline',
+      'Nalburiye': 'construct-outline',
+      'Yedek Parça': 'car-outline',
+      'İnşaat': 'business-outline',
+      'Temizlik': 'water-outline',
+      'Elektronik': 'laptop-outline',
+      'Ofis': 'desktop-outline',
+      'Gıda': 'restaurant-outline',
+      'Tekstil': 'shirt-outline',
+      'Sağlık': 'medkit-outline',
+      'Diğer': 'cube-outline'
+    };
+    
+    return categoryMap[categoryName] || 'cube-outline';
+  };
+
+  const getCategoryColor = (index: number): string => {
+    const colors = [
+      '#4F46E5', // primary
+      '#F43F5E', // secondary
+      '#06B6D4', // cyan
+      '#10B981', // emerald
+      '#F59E0B', // amber
+      '#8B5CF6', // violet
+      '#EC4899', // pink
+    ];
+    
+    return colors[index % colors.length];
+  };
+
+  // Kalan süre veya bitiş zamanı gösterimi için güvenli bir fonksiyon
+  const getTimeRemaining = (listing: Listing): string => {
+    if (listing.expiresAt) {
+      return formatRemainingTime(listing.expiresAt);
+    } else if (listing.endTime) {
+      return formatRemainingTime(listing.endTime);
+    }
+    return '';
+  };
+
+  // Yükleniyor Göstergesi
   if (loading && !refreshing) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[globalStyles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>İlanlar yükleniyor...</Text>
+        <Text style={styles.loadingText}>İlanlar ve kategoriler yükleniyor...</Text>
       </View>
     );
   }
-  
+
   return (
-    <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.Content title="Ters Açık Artırma" />
-        {user?.isAdmin && (
-          <Appbar.Action 
-            icon="cog" 
-            onPress={() => navigation.navigate('AdminDashboard')} 
-          />
-        )}
-      </Appbar.Header>
+    <View style={globalStyles.container}>
+      <StatusBar backgroundColor={colors.background} barStyle="dark-content" />
       
-      <View style={styles.searchContainer}>
-        <Searchbar
-          placeholder="İlan ara..."
-          onChangeText={handleSearch}
-          value={searchQuery}
-          style={styles.searchBar}
-        />
-        
-        <TouchableOpacity 
-          style={styles.filterButton}
-          onPress={() => setFilterMenuVisible(true)}
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Modern Gradient Header */}
+        <LinearGradient
+          colors={['#4F46E5', '#7C3AED']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.header}
         >
-          <Ionicons name="filter" size={22} color="#4F46E5" />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.categorySection}>
-        <TouchableOpacity 
-          style={styles.categoryButton}
-          onPress={() => setCategoryDialogVisible(true)}
-        >
-          <Text style={styles.categoryButtonText}>{getCategoryTitle()}</Text>
-          <Ionicons name="chevron-down" size={16} color="#4B5563" />
-        </TouchableOpacity>
-        
-        {activeFilter !== 'all' && (
-          <Chip 
-            mode="outlined"
-            onClose={() => {
-              setActiveFilter('all');
-              applyFilters(listings, searchQuery, 'all');
-            }}
-            style={styles.filterChip}
-          >
-            {activeFilter === 'active' ? 'Aktif İlanlar' : 'Fiyata Göre'}
-          </Chip>
-        )}
-      </View>
-      
-      <FlatList
-        data={filteredListings}
-        keyExtractor={(item) => item._id}
-        renderItem={({ item }) => {
-          const category = typeof item.category === 'object' ? item.category.name : 'Kategori';
-          const expiryDate = new Date(item.expiresAt);
+          <View style={styles.welcomeContainer}>
+            <Title style={styles.welcomeTitle}>
+              Hoş Geldin, {user?.name?.split(' ')[0] || 'Kullanıcı'}
+            </Title>
+            <Text style={styles.welcomeSubtitle}>
+              Ters Açık Artırma ile tasarruf edin!
+            </Text>
+          </View>
           
-          return (
-            <TouchableOpacity onPress={() => viewListing(item._id)}>
-              <Card style={styles.card}>
-                <Card.Content>
-                  <View style={styles.cardHeader}>
-                    <Title style={styles.cardTitle} numberOfLines={1}>{item.title}</Title>
-                    {getStatusBadge(item)}
-                  </View>
-                  
-                  <Paragraph numberOfLines={2} style={styles.description}>
-                    {item.description}
-                  </Paragraph>
-                  
-                  <Divider style={styles.divider} />
-                  
-                  <View style={styles.cardFooter}>
-                    <View style={styles.itemInfo}>
-                      <Chip icon="tag" style={styles.chip} textStyle={styles.chipText}>
-                        {category}
-                      </Chip>
-                      
-                      {!isPast(expiryDate) && item.status === 'active' && (
-                        <Text style={styles.timeLeft}>
-                          {formatDistanceToNow(expiryDate, { locale: tr, addSuffix: true })}
-                        </Text>
-                      )}
+          <View style={styles.searchContainer}>
+            <TouchableOpacity
+              style={styles.searchButton}
+              onPress={() => navigation.navigate('Kategoriler')}
+            >
+              <Ionicons name={'search-outline'} size={24} color="#4F46E5" />
+              <Text style={styles.searchButtonText}>İlan veya kategori ara</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+        
+        {/* Yeni İlan Oluştur */}
+        {user?.isApproved && (
+          <View style={styles.createListingContainer}>
+            <Button
+              icon="plus-circle-outline"
+              mode="contained"
+              onPress={navigateToCreateListing}
+              color="#4F46E5"
+              style={styles.createButton}
+              labelStyle={styles.createButtonLabel}
+            >
+              Yeni İlan Oluştur
+            </Button>
+          </View>
+        )}
+        
+        {/* Öne Çıkan İlanlar */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeader}>
+            <Title style={styles.sectionTitle}>Öne Çıkan İlanlar</Title>
+            <TouchableOpacity onPress={() => navigateToAllListings()}>
+              <Text style={styles.seeAllButton}>Tümünü Gör</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.featuredListingsContainer}
+            contentContainerStyle={styles.featuredListingsContent}
+          >
+            {featuredListings.length > 0 ? featuredListings.map((listing, index) => (
+              <TouchableOpacity 
+                key={listing._id} 
+                onPress={() => handleListingPress(listing._id)}
+                style={styles.featuredCardContainer}
+              >
+                <Card style={styles.featuredCard}>
+                  <ImageBackground 
+                    source={{ uri: `https://source.unsplash.com/random/400x200/?${listing.category.name}` }} 
+                    style={styles.cardImage}
+                    imageStyle={styles.cardImageStyle}
+                  >
+                    <LinearGradient
+                      colors={['transparent', 'rgba(0,0,0,0.8)']}
+                      style={styles.cardImageOverlay}
+                    />
+                    <View style={styles.cardImageContent}>
+                      <Chip style={styles.categoryBadge}>{listing.category.name}</Chip>
+                      <Text style={styles.imageTimeRemaining}>
+                        {getTimeRemaining(listing)}
+                      </Text>
                     </View>
+                  </ImageBackground>
+                  
+                  <Card.Content style={styles.featuredCardContent}>
+                    <Title style={styles.featuredCardTitle}>{truncateText(listing.title, 60)}</Title>
+                    <Text style={styles.featuredCardDescription}>{truncateText(listing.description, 80)}</Text>
                     
                     <View style={styles.priceContainer}>
-                      <Text style={styles.priceLabel}>Mevcut Fiyat:</Text>
-                      <Text style={styles.price}>{item.currentPrice} TL</Text>
+                      <View>
+                        <Text style={styles.priceLabel}>Güncel Fiyat</Text>
+                        <Text style={styles.price}>{listing.currentPrice.toFixed(2)} ₺</Text>
+                      </View>
+                      <Chip 
+                        style={styles.bidCountChip}
+                        textStyle={styles.bidCountText}
+                      >
+                        {listing.bids.length} Teklif
+                      </Chip>
+                    </View>
+                  </Card.Content>
+                </Card>
+              </TouchableOpacity>
+            )) : (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name={'cube-outline'} size={48} color="#CBD5E0" />
+                <Text style={styles.emptyStateText}>Henüz öne çıkan ilan bulunmuyor</Text>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+        
+        {/* Son Eklenen İlanlar */}
+        <View style={[styles.sectionContainer, { paddingBottom: 24 }]}>
+          <View style={styles.sectionHeader}>
+            <Title style={styles.sectionTitle}>Son Eklenen İlanlar</Title>
+            <TouchableOpacity onPress={() => navigateToAllListings()}>
+              <Text style={styles.seeAllButton}>Tümünü Gör</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.latestListingsContainer}>
+            {latestListings.length > 0 ? latestListings.map((listing) => (
+              <Surface key={listing._id} style={styles.listingCard}>
+                <TouchableOpacity 
+                  style={styles.latestCardContent} 
+                  onPress={() => handleListingPress(listing._id)}
+                >
+                  <View style={styles.latestCardLeft}>
+                    <View style={styles.listingIconContainer}>
+                      <Ionicons
+                        name={getCategoryIconName(listing.category.name)}
+                        size={24}
+                        color="#4F46E5"
+                      />
                     </View>
                   </View>
-                </Card.Content>
-              </Card>
-            </TouchableOpacity>
-          );
-        }}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={64} color="#D1D5DB" />
-            <Text style={styles.emptyText}>İlan bulunamadı</Text>
-            {selectedCategory && (
-              <Button 
-                mode="outlined" 
-                onPress={() => applyCategoryFilter(null)}
-                style={styles.resetButton}
-              >
-                Tümünü Göster
-              </Button>
+                  
+                  <View style={styles.latestCardMiddle}>
+                    <Text style={styles.latestCardTitle}>{truncateText(listing.title, 45)}</Text>
+                    <Text style={styles.latestCardDescription}>{truncateText(listing.description, 60)}</Text>
+                    <View style={styles.latestCardMeta}>
+                      <Chip
+                        style={styles.categoryChip}
+                        textStyle={styles.categoryChipText}
+                      >
+                        {listing.category.name}
+                      </Chip>
+                      <Text style={styles.timeAgo}>
+                        {getTimeRemaining(listing)}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.latestCardRight}>
+                    <Text style={styles.listingPrice}>{listing.currentPrice.toFixed(2)} ₺</Text>
+                    <Text style={styles.bidCount}>{listing.bids.length} Teklif</Text>
+                  </View>
+                </TouchableOpacity>
+              </Surface>
+            )) : (
+              <View style={styles.emptyStateContainer}>
+                <Ionicons name={'document-outline'} size={48} color="#CBD5E0" />
+                <Text style={styles.emptyStateText}>Henüz ilan bulunmuyor</Text>
+              </View>
             )}
           </View>
-        }
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4F46E5']} />
-        }
-      />
-      
-      {user?.isApproved && (
-        <FAB
-          style={styles.fab}
-          icon="plus"
-          label="Yeni İlan"
-          onPress={createNewListing}
-        />
-      )}
-      
-      {/* Kategori Seçme Dialog */}
-      <Portal>
-        <Dialog
-          visible={categoryDialogVisible}
-          onDismiss={() => setCategoryDialogVisible(false)}
-        >
-          <Dialog.Title>Kategori Seçin</Dialog.Title>
-          <Dialog.Content>
-            <TouchableOpacity
-              style={styles.categoryItem}
-              onPress={() => applyCategoryFilter(null)}
-            >
-              <Text style={[styles.categoryItemText, !selectedCategory && styles.selectedCategory]}>
-                Tüm Kategoriler
-              </Text>
-              {!selectedCategory && <Ionicons name="checkmark" size={18} color="#4F46E5" />}
-            </TouchableOpacity>
-            
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category._id}
-                style={styles.categoryItem}
-                onPress={() => applyCategoryFilter(category._id)}
-              >
-                <Text 
-                  style={[
-                    styles.categoryItemText, 
-                    selectedCategory === category._id && styles.selectedCategory
-                  ]}
-                >
-                  {category.name}
-                </Text>
-                {selectedCategory === category._id && (
-                  <Ionicons name="checkmark" size={18} color="#4F46E5" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setCategoryDialogVisible(false)}>Kapat</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-      
-      {/* Filtre Menüsü */}
-      <Menu
-        visible={filterMenuVisible}
-        onDismiss={() => setFilterMenuVisible(false)}
-        anchor={{ x: 300, y: 100 }}
-      >
-        <Menu.Item 
-          title="Tüm İlanlar" 
-          onPress={() => {
-            setActiveFilter('all');
-            applyFilters(listings, searchQuery, 'all');
-            setFilterMenuVisible(false);
-          }}
-          leadingIcon="format-list-bulleted"
-        />
-        <Menu.Item 
-          title="Sadece Aktif İlanlar" 
-          onPress={() => {
-            setActiveFilter('active');
-            applyFilters(listings, searchQuery, 'active');
-            setFilterMenuVisible(false);
-          }}
-          leadingIcon="clock-outline"
-        />
-        <Menu.Item 
-          title="Fiyata Göre Sırala (Düşükten Yükseğe)" 
-          onPress={() => {
-            setActiveFilter('price');
-            applyFilters(listings, searchQuery, 'price');
-            setFilterMenuVisible(false);
-          }}
-          leadingIcon="cash"
-        />
-      </Menu>
+        </View>
+      </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
+    fontSize: 16,
     color: '#6B7280',
+  },
+  header: {
+    width: '100%',
+    padding: 20,
+    paddingTop: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  welcomeContainer: {
+    marginTop: 20,
+  },
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    marginTop: 5,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   searchContainer: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  searchButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     backgroundColor: 'white',
-  },
-  searchBar: {
-    flex: 1,
-    backgroundColor: '#f3f4f6',
-  },
-  filterButton: {
-    marginLeft: 8,
-    padding: 10,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-  },
-  categorySection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingVertical: 12,
+    ...shadowProps,
   },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f3f4f6',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  categoryButtonText: {
-    marginRight: 4,
-    fontSize: 14,
-    color: '#4B5563',
-  },
-  filterChip: {
-    marginLeft: 8,
-    backgroundColor: '#EBF5FF',
-  },
-  listContent: {
-    padding: 8,
-    paddingBottom: 80, // FAB için boşluk
-  },
-  card: {
-    marginVertical: 4,
-    borderRadius: 8,
-    elevation: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  cardTitle: {
-    flex: 1,
+  searchButtonText: {
+    marginLeft: 10,
     fontSize: 16,
-  },
-  description: {
-    fontSize: 14,
     color: '#6B7280',
-    marginBottom: 8,
   },
-  badge: {
-    marginLeft: 4,
+  createListingContainer: {
+    marginTop: 16,
+    paddingHorizontal: 16,
   },
-  activeBadge: {
-    backgroundColor: '#10B981',
+  createButton: {
+    borderRadius: 12,
+    paddingVertical: 6,
+    elevation: 3,
   },
-  completedBadge: {
-    backgroundColor: '#3B82F6',
+  createButtonLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    paddingVertical: 4,
   },
-  expiredBadge: {
-    backgroundColor: '#F59E0B',
+  sectionContainer: {
+    marginTop: 24,
   },
-  cancelledBadge: {
-    backgroundColor: '#EF4444',
-  },
-  divider: {
-    marginVertical: 8,
-  },
-  cardFooter: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
-  itemInfo: {
-    flex: 1,
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
   },
-  chip: {
-    backgroundColor: '#f3f4f6',
+  seeAllButton: {
+    color: '#4F46E5',
+    fontWeight: '600',
+  },
+  featuredListingsContainer: {
+    marginVertical: 5,
+  },
+  featuredListingsContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+  featuredCardContainer: {
+    marginHorizontal: 6,
+    ...shadowProps,
+  },
+  featuredCard: {
+    width: CARD_WIDTH,
+    borderRadius: 16,
+    overflow: 'hidden',
+    elevation: 4,
+  },
+  cardImage: {
+    height: 180,
+    width: '100%',
+    justifyContent: 'space-between',
+  },
+  cardImageStyle: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  cardImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+  },
+  cardImageContent: {
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  categoryBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 8,
     height: 28,
   },
-  chipText: {
-    fontSize: 12,
+  imageTimeRemaining: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
-  timeLeft: {
-    fontSize: 12,
+  featuredCardContent: {
+    padding: 16,
+  },
+  featuredCardTitle: {
+    fontSize: 16, 
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  featuredCardDescription: {
+    fontSize: 14,
     color: '#6B7280',
-    marginTop: 4,
+    marginBottom: 12,
   },
   priceContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'flex-end',
+    marginTop: 8,
   },
   priceLabel: {
     fontSize: 12,
     color: '#6B7280',
   },
   price: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#10B981',
   },
-  emptyContainer: {
+  bidCountChip: {
+    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+    height: 24,
+  },
+  bidCountText: {
+    fontSize: 12,
+    color: '#4F46E5',
+  },
+  latestListingsContainer: {
+    paddingHorizontal: 16,
+  },
+  listingCard: {
+    borderRadius: 16,
+    marginVertical: 6,
+    overflow: 'hidden',
+    elevation: 2,
+  },
+  latestCardContent: {
+    flexDirection: 'row',
+    padding: 12,
+  },
+  latestCardLeft: {
+    marginRight: 12,
+    justifyContent: 'center',
+  },
+  latestCardMiddle: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  latestCardRight: {
+    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  latestCardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  latestCardDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  latestCardMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  listingIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listingPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#10B981',
+    marginBottom: 4,
+  },
+  bidCount: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  timeAgo: {
+    fontSize: 12,
+    color: '#F59E0B',
+    marginLeft: 8,
+  },
+  categoryChip: {
+    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+    height: 24,
+  },
+  categoryChipText: {
+    fontSize: 10,
+    color: '#4F46E5',
+  },
+  emptyStateContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: 40,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    marginHorizontal: 16,
   },
-  emptyText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#9CA3AF',
-  },
-  resetButton: {
+  emptyStateText: {
     marginTop: 16,
-    borderColor: '#4F46E5',
-  },
-  fab: {
-    position: 'absolute',
-    margin: 16,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#4F46E5',
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  categoryItemText: {
     fontSize: 16,
-    color: '#4B5563',
-  },
-  selectedCategory: {
-    color: '#4F46E5',
-    fontWeight: 'bold',
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
 

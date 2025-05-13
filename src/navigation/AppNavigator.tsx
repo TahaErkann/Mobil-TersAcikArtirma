@@ -16,6 +16,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import ListingDetailScreen from '../screens/ListingDetailScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import CreateListingScreen from '../screens/CreateListingScreen';
+import AllListingsScreen from '../screens/AllListingsScreen';
 
 // Admin Ekranları
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
@@ -65,6 +66,8 @@ const MainTabNavigator = () => {
 
           if (route.name === 'Ana Sayfa') {
             iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'İlanlar') {
+            iconName = focused ? 'document-text' : 'document-text-outline';
           } else if (route.name === 'Kategoriler') {
             iconName = focused ? 'list' : 'list-outline';
           } else if (route.name === 'Profil') {
@@ -80,6 +83,11 @@ const MainTabNavigator = () => {
       <Tab.Screen
         name="Ana Sayfa"
         component={HomeScreen}
+        options={{ headerShown: false }}
+      />
+      <Tab.Screen
+        name="İlanlar"
+        component={AllListingsScreen}
         options={{ headerShown: false }}
       />
       <Tab.Screen
@@ -246,6 +254,11 @@ const MainStack = () => (
       name="CreateListing"
       component={CreateListingScreen}
       options={{ title: 'Yeni İlan Oluştur' }}
+    />
+    <Stack.Screen
+      name="AllListings"
+      component={AllListingsScreen}
+      options={{ title: 'Tüm İlanlar' }}
     />
   </Stack.Navigator>
 );

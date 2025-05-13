@@ -16,8 +16,8 @@ const API_URLS = {
   TEST: 'http://192.168.254.112:5001/api',
 };
 
-// Aktif API URL - kendi sunucunuza göre ayarlayın
-const ACTIVE_API_URL = API_URLS.TEST;
+// Aktif API URL - doğrudan IP adresini kullanarak sabitliyoruz (Socket.io ile aynı)
+const ACTIVE_API_URL = 'http://192.168.254.112:5001/api';
 
 // API bağlantı kontrolü
 export const checkApiConnection = async (): Promise<boolean> => {
@@ -26,7 +26,7 @@ export const checkApiConnection = async (): Promise<boolean> => {
     
     // Health endpoint'i kontrol et
     const response = await axios.get(`${ACTIVE_API_URL.replace('/api', '')}/auth/health`, { 
-      timeout: 5000 
+      timeout: 10000 // Zaman aşımını 10 sn'ye çıkar
     });
     
     if (response.status === 200) {
@@ -44,7 +44,7 @@ export const checkApiConnection = async (): Promise<boolean> => {
 // Ana API instance oluştur
 const api = axios.create({
   baseURL: ACTIVE_API_URL,
-  timeout: 15000,
+  timeout: 30000, // Zaman aşımını 30 sn'ye çıkar
   headers: {
     'Content-Type': 'application/json',
   }
@@ -53,18 +53,22 @@ const api = axios.create({
 // Request interceptor - her istekte token ekler
 api.interceptors.request.use(
   async (config) => {
-    // Token varsa ekle
-    const token = await AsyncStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      // Token varsa ekle
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      
+      // API URL'i logla
+      console.log(`API isteği: ${config.url} ${config.method} ${config.baseURL}`);
+      console.log('API İsteği:', config.url, config.data);
+      
+      return config;
+    } catch (err) {
+      console.error('API istek hazırlama hatası:', err);
+      return config;
     }
-    
-    // API URL'i logla
-    console.log(`API isteği: ${config.url} ${config.method} ${config.baseURL}`);
-    
-    console.log('API İsteği:', config.url, config.data);
-    
-    return config;
   },
   (error) => {
     console.error('API İstek Hatası:', error);
@@ -85,7 +89,14 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    console.error('API Yanıt Hatası:', error.response?.data || error.message);
+    // Detaylı hata günlüğü
+    if (error.response) {
+      console.error(`API Yanıt Hatası (${error.response.status}):`, error.response.data);
+    } else if (error.request) {
+      console.error('API Ağ Hatası:', error.code, error.message);
+    } else {
+      console.error('API Beklenmeyen Hata:', error.message);
+    }
     return Promise.reject(error);
   }
 );
@@ -104,11 +115,20 @@ export const apiRequest = async <T>(
       method,
       url,
       data,
-      params
+      params,
+      timeout: 30000 // İstek için ayrı timeout değeri
     });
     
     return response.data;
   } catch (error: any) {
+    console.error('API İstek Hatası Detayları:', {
+      url,
+      method,
+      errorCode: error.code,
+      errorMessage: error.message,
+      errorType: error.name
+    });
+    
     if (error.response) {
       // HTTP hata yanıtı
       const status = error.response.status;
@@ -128,8 +148,15 @@ export const apiRequest = async <T>(
       }
     } else if (error.request) {
       // Network hatası - sunucuya ulaşılamadı
-      console.error('NETWORK HATASI: API sunucusuna erişilemiyor');
-      throw new Error('Sunucuya bağlanılamıyor. Lütfen internet bağlantınızı ve sunucunun çalıştığından emin olun.');
+      console.error('NETWORK HATASI: API sunucusuna erişilemiyor', error.code);
+      
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Sunucuya bağlanma zaman aşımı: İstek çok uzun sürdü, lütfen daha sonra tekrar deneyin.');
+      } else if (error.code === 'ERR_NETWORK') {
+        throw new Error('Ağ hatası: İnternet bağlantınızı kontrol edin veya sunucu çalışmıyor olabilir.');
+      } else {
+        throw new Error('Sunucuya bağlanılamıyor. Lütfen internet bağlantınızı ve sunucunun çalıştığından emin olun.');
+      }
     } else {
       // Diğer hatalar
       throw new Error('API isteği yapılırken bir hata oluştu: ' + error.message);
