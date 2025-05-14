@@ -41,6 +41,32 @@ const GRID_SPACING = 12;
 const NUM_COLUMNS = 2;
 const CARD_WIDTH = (width - (GRID_SPACING * (NUM_COLUMNS + 1))) / NUM_COLUMNS;
 
+// Kategori resimlerini döndüren yardımcı fonksiyon
+const getCategoryImage = (categoryName: string): string => {
+  // Kategori adına göre uygun resimleri belirle (örnek resimler)
+  const categoryImages: Record<string, string> = {
+    "Elektronik": "https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=500",
+    "Mobilya": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=500",
+    "Giyim": "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=500",
+    "Gıda": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=500",
+    "İnşaat": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=500",
+    "Kırtasiye": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=500",
+    "Otomotiv": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?q=80&w=500",
+    "Spor": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=500",
+    "Teknoloji": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=500",
+    "Elektrik": "https://images.unsplash.com/photo-1623871590782-4129f5846c5b?q=80&w=500",
+    "Hırdavat/Nalbur": "https://images.unsplash.com/photo-1562516710-6a880c0c4e5f?q=80&w=500"
+  };
+  
+  // Kategori adı varsa ve resmi tanımlıysa, o resmi döndür
+  if (categoryName && categoryImages[categoryName]) {
+    return categoryImages[categoryName];
+  }
+  
+  // Varsayılan resmi döndür
+  return "https://images.unsplash.com/photo-1607082350899-7e105aa886ae?q=80&w=500";
+};
+
 // Kullanacağımız tip tanımları
 interface Listing {
   _id: string;
@@ -237,7 +263,7 @@ const AllListingsScreen = ({ navigation, route }: AllListingsScreenProps) => {
       >
         <View style={styles.listImageContainer}>
           <ImageBackground
-            source={{ uri: `https://source.unsplash.com/random/300x300/?${item.category.name}` }}
+            source={{ uri: getCategoryImage(item.category.name) }}
             style={styles.listItemImage}
             imageStyle={{ borderRadius: 8 }}
           >
@@ -305,7 +331,7 @@ const AllListingsScreen = ({ navigation, route }: AllListingsScreenProps) => {
     >
       <Card style={styles.gridCard}>
         <ImageBackground
-          source={{ uri: `https://source.unsplash.com/random/300x300/?${item.category.name}` }}
+          source={{ uri: getCategoryImage(item.category.name) }}
           style={styles.gridCardImage}
         >
           <LinearGradient

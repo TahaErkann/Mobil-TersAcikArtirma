@@ -17,6 +17,32 @@ import { Listing as ListingType } from '../types';
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.85;
 
+// Kategori resimlerini döndüren yardımcı fonksiyon
+const getCategoryImage = (categoryName: string): string => {
+  // Kategori adına göre uygun resimleri belirle (örnek resimler)
+  const categoryImages: Record<string, string> = {
+    "Elektronik": "https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=500",
+    "Mobilya": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=500",
+    "Giyim": "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=500",
+    "Gıda": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=500",
+    "İnşaat": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=500",
+    "Kırtasiye": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=500",
+    "Otomotiv": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?q=80&w=500",
+    "Spor": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=500",
+    "Teknoloji": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=500",
+    "Elektrik": "https://images.unsplash.com/photo-1623871590782-4129f5846c5b?q=80&w=500",
+    "Hırdavat/Nalbur": "https://images.unsplash.com/photo-1562516710-6a880c0c4e5f?q=80&w=500"
+  };
+  
+  // Kategori adı varsa ve resmi tanımlıysa, o resmi döndür
+  if (categoryName && categoryImages[categoryName]) {
+    return categoryImages[categoryName];
+  }
+  
+  // Varsayılan resmi döndür
+  return "https://images.unsplash.com/photo-1607082350899-7e105aa886ae?q=80&w=500";
+};
+
 // İonicons tip hatası önleme
 type IconName = 'search-outline' | 'flash-outline' | 'hammer-outline' | 'construct-outline' | 
   'car-outline' | 'business-outline' | 'water-outline' | 'laptop-outline' | 
@@ -305,45 +331,42 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             style={styles.featuredListingsContainer}
             contentContainerStyle={styles.featuredListingsContent}
           >
-            {featuredListings.length > 0 ? featuredListings.map((listing, index) => (
+            {featuredListings.length > 0 ? featuredListings.map((listing) => (
               <TouchableOpacity 
                 key={listing._id} 
-                onPress={() => handleListingPress(listing._id)}
                 style={styles.featuredCardContainer}
+                onPress={() => handleListingPress(listing._id)}
               >
                 <Card style={styles.featuredCard}>
-                  <ImageBackground 
-                    source={{ uri: `https://source.unsplash.com/random/400x200/?${listing.category.name}` }} 
+                  <ImageBackground
+                    source={{ uri: getCategoryImage(listing.category.name) }}
                     style={styles.cardImage}
-                    imageStyle={styles.cardImageStyle}
+                    resizeMode="cover"
                   >
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.8)']}
                       style={styles.cardImageOverlay}
-                    />
-                    <View style={styles.cardImageContent}>
-                      <Chip style={styles.categoryBadge}>{listing.category.name}</Chip>
-                      <Text style={styles.imageTimeRemaining}>
-                        {getTimeRemaining(listing)}
-                      </Text>
-                    </View>
-                  </ImageBackground>
-                  
-                  <Card.Content style={styles.featuredCardContent}>
-                    <Title style={styles.featuredCardTitle}>{truncateText(listing.title, 60)}</Title>
-                    <Text style={styles.featuredCardDescription}>{truncateText(listing.description, 80)}</Text>
-                    
-                    <View style={styles.priceContainer}>
-                      <View>
-                        <Text style={styles.priceLabel}>Güncel Fiyat</Text>
-                        <Text style={styles.price}>{listing.currentPrice.toFixed(2)} ₺</Text>
+                    >
+                      <View style={styles.cardImageContent}>
+                        <Chip 
+                          style={styles.categoryBadge}
+                          textStyle={{ color: '#4F46E5', fontWeight: 'bold' }}
+                        >
+                          {truncateText(listing.category.name, 15)}
+                        </Chip>
+                        
+                        <Text style={styles.imageTimeRemaining}>
+                          {getTimeRemaining(listing)}
+                        </Text>
                       </View>
-                      <Chip 
-                        style={styles.bidCountChip}
-                        textStyle={styles.bidCountText}
-                      >
-                        {listing.bids.length} Teklif
-                      </Chip>
+                    </LinearGradient>
+                  </ImageBackground>
+
+                  <Card.Content style={styles.featuredCardContentContainer}>
+                    <Title style={styles.featuredCardTitle}>{truncateText(listing.title, 45)}</Title>
+                    <View style={styles.featuredPriceContainer}>
+                      <Text style={styles.featuredPrice}>{listing.currentPrice.toFixed(2)} ₺</Text>
+                      <Text style={styles.featuredBidCount}>{listing.bids.length} Teklif</Text>
                     </View>
                   </Card.Content>
                 </Card>
@@ -374,11 +397,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   onPress={() => handleListingPress(listing._id)}
                 >
                   <View style={styles.latestCardLeft}>
-                    <View style={styles.listingIconContainer}>
-                      <Ionicons
-                        name={getCategoryIconName(listing.category.name)}
-                        size={24}
-                        color="#4F46E5"
+                    <View style={styles.listingImageContainer}>
+                      <ImageBackground
+                        source={{ uri: getCategoryImage(listing.category.name) }}
+                        style={styles.listingImage}
+                        resizeMode="cover"
                       />
                     </View>
                   </View>
@@ -548,7 +571,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
-  featuredCardContent: {
+  featuredCardContentContainer: {
     padding: 16,
   },
   featuredCardTitle: {
@@ -556,33 +579,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 6,
   },
-  featuredCardDescription: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 12,
-  },
-  priceContainer: {
+  featuredPriceContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     marginTop: 8,
   },
-  priceLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  price: {
+  featuredPrice: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#10B981',
   },
-  bidCountChip: {
-    backgroundColor: 'rgba(79, 70, 229, 0.1)',
-    height: 24,
-  },
-  bidCountText: {
+  featuredBidCount: {
     fontSize: 12,
-    color: '#4F46E5',
+    color: '#6B7280',
   },
   latestListingsContainer: {
     paddingHorizontal: 16,
@@ -624,13 +634,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  listingIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(79, 70, 229, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  listingImageContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+    elevation: 2,
+  },
+  listingImage: {
+    width: '100%',
+    height: '100%',
   },
   listingPrice: {
     fontSize: 16,
