@@ -3,6 +3,11 @@ import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image }
 import { Text, Title, Card, ActivityIndicator, Divider } from 'react-native-paper';
 import { getAllCategories } from '../services/categoryService';
 import { Category } from '../types';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+interface CategoriesScreenProps {
+  navigation: NativeStackNavigationProp<any>;
+}
 
 // Kategori simge URL'leri
 const categoryIcons: Record<string, string> = {
@@ -21,8 +26,8 @@ const categoryIcons: Record<string, string> = {
   'Temizlik ve Hijyen': 'https://cdn-icons-png.flaticon.com/512/995/995053.png'
 };
 
-const CategoriesScreen = ({ navigation }) => {
-  const [categories, setCategories] = useState([]);
+const CategoriesScreen = ({ navigation }: CategoriesScreenProps) => {
+  const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -49,10 +54,7 @@ const CategoriesScreen = ({ navigation }) => {
   };
 
   const handleCategoryPress = (categoryId: string) => {
-    navigation.navigate('Main', {
-      screen: 'Ana Sayfa',
-      params: { categoryId },
-    });
+    navigation.navigate('AllListings', { categoryId });
   };
 
   if (loading && !refreshing) {

@@ -4,6 +4,7 @@ import { Provider as PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/context/AuthContext';
 import { SocketProvider } from './src/context/SocketContext';
+import { NotificationProvider } from './src/context/NotificationContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import Toast from 'react-native-toast-message';
 import CustomToast from './src/components/Toast';
@@ -75,8 +76,10 @@ export default function App() {
           <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
           <AuthProvider>
             <SocketProvider>
-              <AppNavigator />
-              <Toast config={toastConfig} />
+              <NotificationProvider>
+                <AppNavigator />
+                <Toast config={toastConfig} />
+              </NotificationProvider>
             </SocketProvider>
           </AuthProvider>
         </PaperProvider>

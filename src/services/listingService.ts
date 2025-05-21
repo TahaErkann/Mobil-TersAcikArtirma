@@ -37,9 +37,9 @@ export const getListingById = async (id: string, includeFullDetails: boolean = f
   try {
     console.log(`İlan detayı getiriliyor: ${id}, Tam detaylar: ${includeFullDetails}`);
     
-    // Tam detaylar isteniyorsa özel bir parametre ekle
+    // Tam detaylar isteniyorsa özel parametreler ekle
     const url = includeFullDetails 
-      ? `/listings/${id}?fullDetails=true` 
+      ? `/listings/${id}?fullDetails=true&includeBidderDetails=true&includeUserInfo=true` 
       : `/listings/${id}`;
       
     console.log("API istek URL:", url);

@@ -80,6 +80,18 @@ export interface Listing {
   updatedAt: string;
 }
 
+// Bildirim
+export interface Notification {
+  _id: string;
+  type: 'bid' | 'expiry' | 'approval' | 'rejection' | 'winner';
+  title: string;
+  message: string;
+  relatedListing?: string;
+  relatedBid?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 // API yanıt tipleri
 export interface ApiResponse<T> {
   message?: string;
@@ -128,6 +140,27 @@ export interface SocketContextType {
   on: (event: string, callback: (...args: any[]) => void) => void;
   off: (event: string, callback: (...args: any[]) => void) => void;
   emit: (event: string, data: any) => void;
+}
+
+// Bildirim Yanıtı
+export interface NotificationResponse {
+  notifications: Notification[];
+  unreadCount: number;
+  pagination: {
+    page: number;
+    limit: number;
+    hasMore: boolean;
+  };
+}
+
+// Bildirim Context
+export interface NotificationContextType {
+  notifications: Notification[];
+  unreadCount: number;
+  loading: boolean;
+  markAsRead: (notificationId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  loadNotifications: () => Promise<void>;
 }
 
 // Stats - İstatistik verileri

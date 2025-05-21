@@ -78,6 +78,30 @@ const BidderDetailDialog = ({
   safeFormatDate: (dateStr: string | undefined | null, formatStr?: string) => string;
   isOwner: boolean;
 }) => {
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Kullanıcı bilgileri yüklendiğinde loading'i kapat
+  useEffect(() => {
+    // Teklif ve teklif sahibi bilgileri var mı kontrol et
+    if (selectedBid && (
+      (typeof selectedBid.bidder === 'object' && 
+       selectedBid.bidder && 
+       (selectedBid.bidder.email || selectedBid.bidder.phone)) ||
+      (typeof selectedBid.user === 'object' && 
+       selectedBid.user && 
+       (selectedBid.user.email || selectedBid.user.phone))
+    )) {
+      // Bilgiler yüklendiyse loading'i kapat
+      setIsLoading(false);
+    } else if (selectedBid) {
+      // Teklif var ama detaylı bilgi yoksa kısa bir süre bekleyip loading'i kapat
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedBid]);
+  
   if (!selectedBid) {
     return (
       <Dialog.Content>
@@ -103,18 +127,6 @@ const BidderDetailDialog = ({
       ? selectedBid.user 
       : null;
   
-  // Debug için kullanıcı bilgilerini konsola yazdır
-  console.log("Teklif Veren Kullanıcı Detayları:", bidder ? 
-    JSON.stringify({
-      _id: bidder._id, 
-      name: bidder.name,
-      email: bidder.email,
-      phone: bidder.phone,
-      address: bidder.address,
-      companyInfo: bidder.companyInfo
-    }) : "Bilgi yok"
-  );
-  
   if (!bidder) {
     return (
       <Dialog.Content>
@@ -139,15 +151,22 @@ const BidderDetailDialog = ({
   
   // Teklif durumu ve izin kontrolü
   const isAccepted = selectedBid.status === 'accepted' || selectedBid.isApproved === true;
+  const isRejected = selectedBid.status === 'rejected';
   
-  // İlan sahibi değilse ve teklif kabul edilmemişse, sınırlı bilgi göster
-  if (!isOwner && !isAccepted) {
+  // İlan sahibi değilse ve teklif kabul edilmemişse veya reddedilmişse, sınırlı bilgi göster
+  if ((!isOwner && !isAccepted) || isRejected) {
     return (
       <Dialog.Content>
         <View>
           <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Teklif Detayları</Text>
-          <Text style={{ marginBottom: 8 }}>Bu teklifin detaylı bilgilerine erişim izniniz yok.</Text>
-          <Text style={{ marginBottom: 16 }}>Teklif bilgileri gizlilik politikası gereği korunmaktadır.</Text>
+          {isRejected ? (
+            <Text style={{ marginBottom: 16, color: '#EF4444' }}>Bu teklif reddedilmiştir. Detay bilgilerine erişilemez.</Text>
+          ) : (
+            <>
+              <Text style={{ marginBottom: 8 }}>Bu teklifin detaylı bilgilerine erişim izniniz yok.</Text>
+              <Text style={{ marginBottom: 16 }}>Teklif bilgileri gizlilik politikası gereği korunmaktadır.</Text>
+            </>
+          )}
           
           <View style={{ backgroundColor: '#f5f5f5', padding: 12, borderRadius: 8, marginBottom: 16 }}>
             <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>Teklif Özeti:</Text>
@@ -162,16 +181,31 @@ const BidderDetailDialog = ({
   
   // Yeterli bilgi var mı kontrol et
   const hasDetailedInfo = bidder.email || bidder.phone || bidder.address || 
-                         (bidder.companyInfo && Object.keys(bidder.companyInfo).length > 0);
+                         (bidder.companyInfo && Object.keys(bidder.companyInfo).length > 0) ||
+                         bidder.nationalId || bidder.birthDate || bidder.gender;
   
-  // Kabul edilmiş teklifte detaylı bilgi yoksa
+  // Yükleniyor göstergesi
+  if (isLoading && isAccepted && isOwner) {
+    return (
+      <Dialog.Content>
+        <View style={{ alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <ActivityIndicator size="large" color="#4F46E5" />
+          <Text style={{ marginTop: 16, textAlign: 'center' }}>
+            Teklif sahibi bilgileri yükleniyor...
+          </Text>
+        </View>
+      </Dialog.Content>
+    );
+  }
+  
+  // Kabul edilmiş teklifte detaylı bilgi yoksa, tam bilgileri yeniden yükleme seçeneği sun
   if (isAccepted && isOwner && !hasDetailedInfo) {
     return (
       <Dialog.Content>
         <View>
           <Text style={{ fontWeight: 'bold', marginBottom: 10 }}>Detaylı kullanıcı bilgileri bulunamadı</Text>
           <Text style={{ marginBottom: 8 }}>Teklif sahibinin bilgileri sistem tarafından tam olarak alınamadı.</Text>
-          <Text style={{ marginBottom: 16 }}>Bilgileri almak için lütfen önce sayfı yenileyin.</Text>
+          <Text style={{ marginBottom: 16 }}>Bilgileri almak için lütfen sayfayı yenileyiniz.</Text>
           
           <View style={{ backgroundColor: '#f5f5f5', padding: 12, borderRadius: 8, marginBottom: 16 }}>
             <Text style={{ fontWeight: 'bold', marginBottom: 4 }}>Mevcut Bilgiler:</Text>
@@ -189,7 +223,7 @@ const BidderDetailDialog = ({
             }}
             style={{ marginTop: 8 }}
           >
-            Sayfı Yenile
+            Sayfayı Yenile
           </Button>
         </View>
       </Dialog.Content>
@@ -354,16 +388,32 @@ const BidderDetailDialog = ({
                       }
                     />
                   )}
+                  
+                  {bidder.companyInfo?.description && (
+                    <List.Item
+                      title="Firma Açıklaması"
+                      description={bidder.companyInfo.description}
+                      left={props => <List.Icon {...props} icon="information-outline" />}
+                    />
+                  )}
                 </List.Section>
               </>
             )}
             
-            {/* Diğer profil bilgileri */}
-            {(bidder.birthDate || bidder.gender || bidder.nationalId) && (
+            {/* Kullanıcı TC Kimlik bilgileri bölümü */}
+            {(bidder.nationalId || bidder.birthDate || bidder.gender) && (
               <>
                 <Divider style={styles.divider} />
                 
-                <List.Section title="Diğer Bilgiler">
+                <List.Section title="Kimlik Bilgileri">
+                  {bidder.nationalId && (
+                    <List.Item
+                      title="T.C. Kimlik No"
+                      description={bidder.nationalId}
+                      left={props => <List.Icon {...props} icon="card-account-details" />}
+                    />
+                  )}
+                  
                   {bidder.birthDate && (
                     <List.Item
                       title="Doğum Tarihi"
@@ -376,15 +426,7 @@ const BidderDetailDialog = ({
                     <List.Item
                       title="Cinsiyet"
                       description={bidder.gender === 'male' ? 'Erkek' : bidder.gender === 'female' ? 'Kadın' : bidder.gender}
-                      left={props => <List.Icon {...props} icon="account" />}
-                    />
-                  )}
-                  
-                  {bidder.nationalId && (
-                    <List.Item
-                      title="T.C. Kimlik No"
-                      description={bidder.nationalId}
-                      left={props => <List.Icon {...props} icon="card-account-details" />}
+                      left={props => <List.Icon {...props} icon="human-male-female" />}
                     />
                   )}
                 </List.Section>
@@ -401,17 +443,58 @@ const BidderDetailDialog = ({
 const getCategoryImage = (categoryName: string): string => {
   // Kategori adına göre uygun resimleri belirle (örnek resimler)
   const categoryImages: Record<string, string> = {
+    // Elektronik ve Teknoloji
     "Elektronik": "https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=500",
-    "Mobilya": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=500",
-    "Giyim": "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=500",
-    "Gıda": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=500",
-    "İnşaat": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=500",
-    "Kırtasiye": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=500",
-    "Otomotiv": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?q=80&w=500",
-    "Spor": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=500",
     "Teknoloji": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=500",
-    "Elektrik": "https://images.unsplash.com/photo-1623871590782-4129f5846c5b?q=80&w=500",
-    "Hırdavat/Nalbur": "https://images.unsplash.com/photo-1562516710-6a880c0c4e5f?q=80&w=500"
+    "Elektrik": "https://images.unsplash.com/photo-1544724569-5f546fd6f2b5?q=80&w=500",
+    "Bilgisayar": "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=500",
+    
+    // Ev ve Mobilya
+    "Mobilya": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=500",
+    "Ev Eşyaları": "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?q=80&w=500",
+    "Beyaz Eşya": "https://images.unsplash.com/photo-1584971217142-d63151e44256?q=80&w=500",
+    
+    // Giyim ve Tekstil
+    "Giyim": "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=500",
+    "Tekstil": "https://images.unsplash.com/photo-1620799140188-3b2a02fd9a77?q=80&w=500",
+    "Ayakkabı": "https://images.unsplash.com/photo-1595341888016-a392ef81b7de?q=80&w=500",
+    
+    // Yiyecek ve İçecek
+    "Gıda": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=500",
+    "İçecek": "https://images.unsplash.com/photo-1544145945-f90425340c7e?q=80&w=500",
+    "Tarım": "https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?q=80&w=500",
+    
+    // İnşaat ve Yapı Malzemeleri
+    "İnşaat": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=500",
+    "İnşaat Malzemeleri": "https://images.unsplash.com/photo-1621155346337-1d19495a11ab?q=80&w=500",
+    "Yapı Malzemeleri": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=500",
+    
+    // Ofis ve Kırtasiye
+    "Kırtasiye": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=500",
+    "Ofis Malzemeleri": "https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?q=80&w=500",
+    "Kitap": "https://images.unsplash.com/photo-1516979187457-637abb4f9353?q=80&w=500",
+    
+    // Otomotiv
+    "Otomotiv": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?q=80&w=500",
+    "Oto Yedek Parça": "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?q=80&w=500",
+    "Araç": "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?q=80&w=500",
+    
+    // Spor ve Sağlık
+    "Spor": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=500",
+    "Fitness": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=500",
+    "Medikal": "https://images.unsplash.com/photo-1631815588090-d4bfec5b7e5c?q=80&w=500",
+    "Sağlık": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=500",
+    "Eczane": "https://images.unsplash.com/photo-1563453392212-326f5e854473?q=80&w=500",
+    "Kozmetik": "https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=500",
+    "Bakım Ürünleri": "https://images.unsplash.com/photo-1590439471364-192aa70c0b53?q=80&w=500",
+    
+    // Diğer Kategoriler
+    "Hırdavat/Nalbur": "https://images.unsplash.com/photo-1562516710-6a880c0c4e5f?q=80&w=500",
+    "Bahçe": "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=500",
+    "Kimyasal": "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?q=80&w=500",
+    "Temizlik": "https://images.unsplash.com/photo-1583947215259-38e31be8751f?q=80&w=500",
+    "Ambalaj": "https://images.unsplash.com/photo-1607344645866-009c320c5ab8?q=80&w=500",
+    "Endüstriyel": "https://images.unsplash.com/photo-1537427294423-eea2d66b0cc8?q=80&w=500"
   };
   
   // Kategori adı varsa ve resmi tanımlıysa, o resmi döndür
@@ -419,15 +502,18 @@ const getCategoryImage = (categoryName: string): string => {
     return categoryImages[categoryName];
   }
   
-  // Varsayılan resmi döndür
-  return "https://images.unsplash.com/photo-1607082350899-7e105aa886ae?q=80&w=500";
+  // Varsayılan resmi döndür - diğer sayfalar ile aynı yüksek kaliteli ürün rafı görseli
+  return "https://images.unsplash.com/photo-1607082349566-187342175e2f?q=80&w=500";
 };
 
 const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, navigation }) => {
   // useAuth hook'undan user bilgilerini alalım
-  const { user, isAuthenticated } = useAuth();
+  const { user, token } = useAuth();
   // route.params'dan id bilgisini alalım
-  const { id } = route.params;
+  const { id } = route.params || {};
+  
+  console.log("ScreenParams:", route.params);
+  console.log("İlan ID:", id);
   
   const [listing, setListing] = useState<Listing | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -441,36 +527,94 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
   const [bidderDialogVisible, setBidderDialogVisible] = useState<boolean>(false);
   
+  const [allBidsDialogVisible, setAllBidsDialogVisible] = useState<boolean>(false);
+  
   // Ekran genişliğine göre yüksekliği belirle
   const screenWidth = Dimensions.get('window').width;
   const cardHeight = screenWidth * 0.6; // 16:9 oranı için
   
+  // Sayfa yüklendiğinde ilan detaylarını getir
   useEffect(() => {
     if (id) {
+      console.log("İlk yükleme - İlan ID:", id);
       loadListing();
     } else {
       setError('İlan ID bilgisi bulunamadı');
       setLoading(false);
     }
   }, [id]);
-  
+
   const loadListing = async (fullDetails = false) => {
-    if (!id) {
-      setError('İlan ID bilgisi bulunamadı');
-      setLoading(false);
-      return;
-    }
-    
     try {
       setLoading(true);
       setError(null);
-      console.log(`İlan detayı yükleniyor: ${id}`);
+      
+      // İlan ID'sini al
+      if (!id) {
+        console.error('İlan ID bulunamadı');
+        setError('İlan ID bulunamadı');
+        setLoading(false);
+        return;
+      }
+      
+      console.log(`İlan detayları yükleniyor: ${id}, tam detay: ${fullDetails}`);
+      
+      // getListingById servisini kullan
       const data = await getListingById(id, fullDetails);
+      
+      console.log("İlan detayları başarıyla alındı:", data?._id);
+      
+      // İlanı state'e kaydet
       setListing(data);
-    } catch (err: any) {
-      setError(err.message || 'İlan yüklenirken bir hata oluştu');
-      console.error('İlan yükleme hatası:', err);
-    } finally {
+      setBidAmount('');
+      
+      // İlan sahibi ya da teklif kabul edilmiş ve tam detay istenmişse
+      // kullanıcı bilgilerini yeniden çek
+      if (fullDetails && data.bids && data.bids.length > 0) {
+        // Aktif olan seçili teklifi de güncelle
+        if (selectedBid) {
+          const updatedSelectedBid = data.bids.find((b: any) => b._id === selectedBid._id);
+          if (updatedSelectedBid) {
+            console.log("Seçili teklif güncellendi:", updatedSelectedBid);
+            // Seçilen teklifin verileri eksikse, yeniden tam detay isteği yap
+            if (updatedSelectedBid.status === 'accepted' && 
+                (typeof updatedSelectedBid.bidder === 'object' && 
+                 (!updatedSelectedBid.bidder.email || !updatedSelectedBid.bidder.phone || 
+                  !updatedSelectedBid.bidder.address))) {
+              console.log("Kabul edilmiş teklifin bilgileri eksik, tam detayları yüklüyorum...");
+              // Hemen yeniden detayları yükle
+              setTimeout(async () => {
+                const fullDetailData = await getListingById(id, true);
+                // Teklifleri güncelle
+                setListing(fullDetailData);
+                // Seçili teklifi bul ve güncelle
+                const fullDetailBid = fullDetailData.bids.find((b: any) => b._id === selectedBid._id);
+                if (fullDetailBid) {
+                  setSelectedBid(fullDetailBid);
+                }
+              }, 500);
+            } else {
+              setSelectedBid(updatedSelectedBid);
+            }
+          }
+        }
+        
+        // Kabul edilmiş teklifi bul
+        const acceptedBid = data.bids.find((b: any) => b.status === 'accepted' || b.isApproved === true);
+        if (acceptedBid) {
+          console.log("Kabul edilmiş teklif bulundu:", acceptedBid);
+          if (selectedBid && acceptedBid._id === selectedBid._id) {
+            // Eğer kullanıcı bu teklifi zaten görüntülüyorsa, yeni verileri göster
+            setSelectedBid(acceptedBid);
+          }
+        }
+      }
+      
+      setLoading(false);
+      setRefreshing(false);
+    } catch (error: any) {
+      console.error('İlan detayları yüklenirken hata oluştu:', error);
+      setError(error?.message || 'Bir hata oluştu. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.');
       setLoading(false);
       setRefreshing(false);
     }
@@ -483,7 +627,7 @@ const ListingDetailScreen: React.FC<ListingDetailScreenProps> = ({ route, naviga
   
   const openBidDialog = () => {
     // Aktif kullanıcı yoksa giriş sayfasına yönlendir
-    if (!isAuthenticated) {
+    if (!token) {
       Alert.alert(
         'Giriş Gerekli',
         'Teklif vermek için giriş yapmalısınız.',
@@ -613,9 +757,27 @@ En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif verebilirsiniz.`,
           onPress: async () => {
             try {
               setLoading(true);
-              await acceptBid(listing._id, bidId);
+              const updatedListing = await acceptBid(listing._id, bidId);
+              
+              // Kabul edilen teklifi hemen bul ve göster
+              const acceptedBid = updatedListing?.bids?.find(b => b._id === bidId);
+              if (acceptedBid) {
+                // Önce dialogu göster
+                setSelectedBid(acceptedBid);
+                setBidderDialogVisible(true);
+                
+                // Sonra arka planda tam detayları yükle
+                const fullDetailData = await getListingById(id as string, true);
+                setListing(fullDetailData);
+                
+                // Tam detaylı teklifi bul ve güncelle
+                const fullDetailBid = fullDetailData?.bids?.find(b => b._id === bidId);
+                if (fullDetailBid) {
+                  setSelectedBid(fullDetailBid);
+                }
+              }
+              
               Alert.alert('Başarılı', 'Teklif başarıyla kabul edildi.');
-              loadListing(true);
             } catch (err: any) {
               console.error('Teklif kabul hatası:', err);
               Alert.alert('Hata', err.message || 'Teklif kabul edilirken bir hata oluştu.');
@@ -660,8 +822,31 @@ En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif verebilirsiniz.`,
   
   // Teklif veren detaylarını göster
   const showBidderDetails = (bid: Bid) => {
+    // Önce teklifi ve dialogu göster - sonra verileri yükle
     setSelectedBid(bid);
     setBidderDialogVisible(true);
+    
+    // Arka planda verileri yükle - kullanıcı beklemeden dialog görünür olur
+    if (bid.status === 'accepted' || isOwner()) {
+      // Arka planda detayları yükle
+      (async () => {
+        try {
+          // Dialog gösterildikten sonra detayları arka planda yükle
+          const fullDetailData = await getListingById(id as string, true);
+          
+          // İlgili teklifi bul
+          const fullDetailBid = fullDetailData.bids.find((b: any) => b._id === bid._id);
+          
+          if (fullDetailBid) {
+            // Tüm verileri güncelle
+            setListing(fullDetailData);
+            setSelectedBid(fullDetailBid);
+          }
+        } catch (error) {
+          console.error("Teklif bilgileri yüklenirken hata:", error);
+        }
+      })();
+    }
   };
   
   // İlanın sahibi olup olmadığını kontrol et
@@ -933,7 +1118,8 @@ En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif verebilirsiniz.`,
                       key={bid._id} 
                       style={styles.bidCardNew}
                       onPress={() => {
-                        if (isOwner()) {
+                        // Reddedilen teklifleri görüntüleme
+                        if (bid.status !== 'rejected' && (isOwner() || bid.status === 'accepted')) {
                           showBidderDetails(bid);
                         }
                       }}
@@ -943,6 +1129,7 @@ En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif verebilirsiniz.`,
                           <Avatar.Text 
                             size={36} 
                             label={
+                              bid.status === 'rejected' ? '?' :
                               (typeof bid.bidder === 'object' && bid.bidder?.name?.charAt(0)) || 
                               (typeof bid.user === 'object' && bid.user?.name?.charAt(0)) || 
                               '?'
@@ -952,7 +1139,8 @@ En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif verebilirsiniz.`,
                           
                           <View style={styles.bidderInfoNew}>
                             <Text style={styles.bidderNameNew}>
-                              {(typeof bid.bidder === 'object' && bid.bidder?.name) || 
+                              {bid.status === 'rejected' ? 'Gizli' :
+                               (typeof bid.bidder === 'object' && bid.bidder?.name) || 
                                (typeof bid.user === 'object' && bid.user?.name) || 
                                'İsimsiz Kullanıcı'}
                             </Text>
@@ -984,7 +1172,16 @@ En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif verebilirsiniz.`,
                             <View style={styles.bidActionButtonsNew}>
                               <Button 
                                 mode="contained" 
-                                onPress={() => handleAcceptBid(bid._id)}
+                                onPress={() => {
+                                  handleAcceptBid(bid._id);
+                                  setAllBidsDialogVisible(false);
+                                  // Dialog açılmadan önce tüm bilgileri yükleyin
+                                  // Seçili teklifi bul ve açılacak dialogu hazırla
+                                  const updatedBid = listing.bids.find((b) => b._id === bid._id);
+                                  if (updatedBid) {
+                                    showBidderDetails(updatedBid);
+                                  }
+                                }}
                                 style={[styles.actionButtonNew, styles.acceptButtonNew]}
                                 labelStyle={styles.actionButtonLabelNew}
                                 compact
@@ -1014,7 +1211,7 @@ En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif verebilirsiniz.`,
                       mode="outlined" 
                       onPress={() => {
                         // Daha fazla teklif gösterme işlevi
-                        Alert.alert("Bilgi", "Daha fazla teklif gösterme özelliği yakında eklenecek!");
+                        setAllBidsDialogVisible(true);
                       }}
                       style={styles.showMoreButton}
                     >
@@ -1030,6 +1227,117 @@ En fazla ${minimumAcceptablePrice.toFixed(2)} TL teklif verebilirsiniz.`,
       
       {/* Dialogs */}
       <Portal>
+        {/* Tüm teklifleri göster diyaloğu */}
+        <Dialog
+          visible={allBidsDialogVisible}
+          onDismiss={() => setAllBidsDialogVisible(false)}
+          style={{ ...styles.dialogContainer, maxHeight: '80%' }}
+        >
+          <Dialog.Title>Tüm Teklifler ({listing?.bids?.length || 0})</Dialog.Title>
+          <Dialog.ScrollArea style={{ paddingHorizontal: 0 }}>
+            <FlatList
+              data={listing?.bids}
+              renderItem={({ item: bid }) => (
+                <TouchableOpacity 
+                  style={styles.allBidsItem}
+                  onPress={() => {
+                    // Reddedilen teklifleri açma
+                    if (bid.status !== 'rejected' && (isOwner() || bid.status === 'accepted')) {
+                      setAllBidsDialogVisible(false);
+                      // Teklif sahibi detaylarını asenkron olarak göster
+                      showBidderDetails(bid);
+                    }
+                  }}
+                >
+                  <View style={styles.bidCardHeaderNew}>
+                    <Avatar.Text 
+                      size={32} 
+                      label={
+                        bid.status === 'rejected' ? '?' :
+                        (typeof bid.bidder === 'object' && bid.bidder?.name?.charAt(0)) || 
+                        (typeof bid.user === 'object' && bid.user?.name?.charAt(0)) || 
+                        '?'
+                      }
+                      style={styles.bidderAvatar}
+                    />
+                    
+                    <View style={styles.bidderInfoNew}>
+                      <Text style={styles.bidderNameNew}>
+                        {bid.status === 'rejected' ? 'Gizli' :
+                         (typeof bid.bidder === 'object' && bid.bidder?.name) || 
+                         (typeof bid.user === 'object' && bid.user?.name) || 
+                         'İsimsiz Kullanıcı'}
+                      </Text>
+                      
+                      <Text style={styles.bidTimeNew}>
+                        {safeFormatDate(bid.createdAt || bid.timestamp)}
+                      </Text>
+                    </View>
+                    
+                    <Text style={styles.bidAmountNew}>
+                      {formatPrice(bid.price || bid.amount)}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.bidStatusSectionNew}>
+                    <Chip 
+                      style={[
+                        styles.bidStatusChipNew,
+                        { backgroundColor: getBidStatusColor(bid.status, isExpired()) }
+                      ]}
+                      textStyle={{ color: 'white' }}
+                    >
+                      {getBidStatusText(bid.status, isExpired())}
+                    </Chip>
+                    
+                    {isOwner() && bid.status === 'pending' && !isExpired() && (
+                      <View style={styles.bidActionButtonsNew}>
+                        <Button 
+                          mode="contained" 
+                          onPress={() => {
+                            handleAcceptBid(bid._id);
+                            setAllBidsDialogVisible(false);
+                            // Dialog açılmadan önce tüm bilgileri yükleyin
+                            // Seçili teklifi bul ve açılacak dialogu hazırla
+                            const updatedBid = listing.bids.find((b) => b._id === bid._id);
+                            if (updatedBid) {
+                              showBidderDetails(updatedBid);
+                            }
+                          }}
+                          style={[styles.actionButtonNew, styles.acceptButtonNew]}
+                          labelStyle={styles.actionButtonLabelNew}
+                          compact
+                        >
+                          Kabul Et
+                        </Button>
+                        
+                        <Button 
+                          mode="outlined" 
+                          onPress={() => {
+                            handleRejectBid(bid._id);
+                            setAllBidsDialogVisible(false);
+                          }}
+                          style={[styles.actionButtonNew, styles.rejectButtonNew]}
+                          labelStyle={{ color: '#EF4444' }}
+                          compact
+                        >
+                          Reddet
+                        </Button>
+                      </View>
+                    )}
+                  </View>
+                  <Divider style={{ marginVertical: 8 }} />
+                </TouchableOpacity>
+              )}
+              keyExtractor={(bid) => bid._id}
+              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
+            />
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={() => setAllBidsDialogVisible(false)}>Kapat</Button>
+          </Dialog.Actions>
+        </Dialog>
+        
         {/* Teklif verme dialog'u */}
         <Dialog
           visible={bidDialogVisible}

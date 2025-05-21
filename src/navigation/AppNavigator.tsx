@@ -17,6 +17,7 @@ import ListingDetailScreen from '../screens/ListingDetailScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import CreateListingScreen from '../screens/CreateListingScreen';
 import AllListingsScreen from '../screens/AllListingsScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 // Admin Ekranları
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
@@ -30,6 +31,7 @@ type MainStackParamList = {
   ListingDetail: { id: string };
   CreateListing: undefined;
   Home: undefined;
+  Notifications: undefined;
 };
 
 type AdminStackParamList = {
@@ -37,14 +39,8 @@ type AdminStackParamList = {
   ListingDetail: { id: string };
 };
 
-type AuthStackParamList = {
-  Welcome: undefined;
-  Login: undefined;
-  Register: undefined;
-};
-
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const AuthStackNav = createNativeStackNavigator<AuthStackParamList>();
+const AuthStackNav = createNativeStackNavigator<RootStackParamList>();
 const AdminStackNav = createNativeStackNavigator<AdminStackParamList>();
 const Tab = createBottomTabNavigator();
 
@@ -259,6 +255,11 @@ const MainStack = () => (
       name="AllListings"
       component={AllListingsScreen}
       options={{ title: 'Tüm İlanlar' }}
+    />
+    <Stack.Screen
+      name="Notifications"
+      component={NotificationsScreen}
+      options={{ title: 'Bildirimler' }}
     />
   </Stack.Navigator>
 );

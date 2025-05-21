@@ -1,10 +1,11 @@
-// Navigasyon tip tanımlamaları
 export type RootStackParamList = {
   // Ana ekranlar
   Main: undefined;
   Home: undefined;
   ListingDetail: { id: string };
   CreateListing: undefined;
+  AllListings: undefined;
+  Notifications: undefined;
   
   // Auth ekranları
   Welcome: undefined;

@@ -355,10 +355,16 @@ export const listingDetailStyles = StyleSheet.create({
     marginTop: 8,
   },
   
-  // Dialog Stilleri
+  // Tüm teklifler listesi için stil
+  allBidsItem: {
+    paddingVertical: 8,
+  },
+  
+  // Dialog
   dialogContainer: {
-    borderRadius: 12,
     backgroundColor: 'white',
+    borderRadius: 12,
+    maxWidth: '95%',
   },
   dialogText: {
     color: '#4B5563',
