@@ -1,4 +1,3 @@
-import api from './api';
 import { User } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../types';
@@ -109,19 +108,33 @@ export const register = async (
   try {
     console.log('Kayıt yapılıyor:', email);
     
-    const response = await apiRequest<{ user: User; token: string }>(
+    const response = await apiRequest<{ user: User; token: string; message?: string }>(
       'post',
       '/auth/register',
       { name, email, password }
     );
     
-    // Token'ı kaydet
-    if (response.token) {
-      await AsyncStorage.setItem('token', response.token);
-      console.log('Token kaydedildi');
+    console.log('Register API yanıtı:', response);
+    
+    // Response kontrolü - backend'den gelen yapıyı kontrol et
+    if (!response) {
+      throw new Error('Sunucudan geçersiz yanıt alındı');
     }
     
-    return response;
+    // User ve token kontrolü
+    if (!response.user || !response.token) {
+      console.error('Register yanıtında eksik bilgi:', { user: !!response.user, token: !!response.token });
+      throw new Error('Kayıt yanıtında kullanıcı veya token bilgisi eksik');
+    }
+    
+    // Token'ı kaydet
+    await AsyncStorage.setItem('token', response.token);
+    console.log('Register başarılı, token kaydedildi');
+    
+    return {
+      user: response.user,
+      token: response.token
+    };
   } catch (error: any) {
     console.error('Kayıt başarısız:', error.message);
     
@@ -164,43 +177,110 @@ export const isTokenValid = (token: string): boolean => {
 // Mevcut kullanıcı bilgilerini getir
 export const getCurrentUser = async (): Promise<User> => {
   try {
-    const response = await apiRequest<{ user: User }>('get', '/auth/me');
-    return response.user;
+    console.log('getCurrentUser: API çağrısı başlatılıyor');
+    const response = await apiRequest<User>('get', '/auth/me');
+    console.log('getCurrentUser: Backend yanıtı (tüm obje):', JSON.stringify(response, null, 2));
+    console.log('getCurrentUser: CompanyInfo mevcut mu?', !!response.companyInfo);
+    console.log('getCurrentUser: CompanyInfo içeriği:', response.companyInfo);
+    
+    // CompanyInfo undefined ise default değerler ata
+    if (!response.companyInfo) {
+      response.companyInfo = {
+        companyName: '',
+        address: '',
+        city: '',
+        phone: '',
+        taxNumber: '',
+        description: ''
+      };
+      console.log('getCurrentUser: CompanyInfo undefined idi, default değerler atandı');
+    }
+    
+    return response;
   } catch (error: any) {
-    console.error('Kullanıcı bilgileri alınamadı:', error.message);
+    console.error('getCurrentUser: Kullanıcı bilgileri alınamadı:', error.message);
     throw error;
   }
 };
 
 // Profil bilgilerini güncelle
 export const updateProfile = async (profileData: Partial<User['companyInfo']>): Promise<User> => {
-  const response = await api.put('/auth/profile', profileData);
-  return response.data.user;
+  try {
+    console.log('updateProfile: Profil güncelleniyor:', profileData);
+    
+    const response = await apiRequest<{ user: User; message?: string }>(
+      'put',
+      '/auth/profile',
+      profileData
+    );
+    
+    console.log('updateProfile: Backend yanıtı (raw):', response);
+    
+    if (!response || !response.user) {
+      console.error('updateProfile: Yanıtta user objesi yok:', response);
+      throw new Error('Profil güncelleme yanıtında kullanıcı bilgisi eksik');
+    }
+    
+    // CompanyInfo undefined ise default değerler ata
+    if (!response.user.companyInfo) {
+      response.user.companyInfo = {
+        companyName: '',
+        address: '',
+        city: '',
+        phone: '',
+        taxNumber: '',
+        description: ''
+      };
+    }
+    
+    console.log('updateProfile: Döndürülecek user objesi:', response.user);
+    console.log('updateProfile: User companyInfo:', response.user.companyInfo);
+    
+    return response.user;
+  } catch (error: any) {
+    console.error('updateProfile: Profil güncelleme hatası:', error.message);
+    throw error;
+  }
 };
 
 // Admin: Tüm kullanıcıları listele
 export const getAllUsers = async (): Promise<User[]> => {
-  const response = await api.get('/auth/users');
-  return response.data;
+  try {
+    const response = await apiRequest<User[]>('get', '/auth/users');
+    return response;
+  } catch (error: any) {
+    console.error('Kullanıcı listesi alınamadı:', error.message);
+    throw error;
+  }
 };
 
 // Admin: Kullanıcıyı onayla
 export const approveUser = async (userId: string): Promise<User> => {
-  const response = await api.put(`/auth/users/${userId}/approve`);
-  return response.data.user;
+  try {
+    const response = await apiRequest<{ user: User }>('put', `/auth/users/${userId}/approve`);
+    return response.user;
+  } catch (error: any) {
+    console.error('Kullanıcı onaylama hatası:', error.message);
+    throw error;
+  }
 };
 
 // Admin: Kullanıcıyı reddet
 export const rejectUser = async (userId: string, reason: string): Promise<User> => {
-  const response = await api.put(`/auth/users/${userId}/reject`, { reason });
-  return response.data.user;
+  try {
+    const response = await apiRequest<{ user: User }>('put', `/auth/users/${userId}/reject`, { reason });
+    return response.user;
+  } catch (error: any) {
+    console.error('Kullanıcı reddetme hatası:', error.message);
+    throw error;
+  }
 };
 
 // Firmaları getir
 export const getAllCompanies = async (): Promise<User[]> => {
   try {
-    const response = await api.get('/auth/companies');
-    return response.data;
+    const response = await apiRequest<User[]>('get', '/auth/companies');
+    return response;
   } catch (error) {
     throw handleApiError(error);
   }
@@ -209,8 +289,8 @@ export const getAllCompanies = async (): Promise<User[]> => {
 // Onay bekleyen şirketleri getir
 export const getPendingCompanies = async (): Promise<User[]> => {
   try {
-    const response = await api.get('/auth/companies/pending');
-    return response.data;
+    const response = await apiRequest<User[]>('get', '/auth/companies/pending');
+    return response;
   } catch (error) {
     throw handleApiError(error);
   }
@@ -219,8 +299,8 @@ export const getPendingCompanies = async (): Promise<User[]> => {
 // Firmayı onayla
 export const approveCompany = async (userId: string): Promise<User> => {
   try {
-    const response = await api.put(`/auth/companies/${userId}/approve`);
-    return response.data;
+    const response = await apiRequest<{ user: User }>('put', `/auth/companies/${userId}/approve`);
+    return response.user;
   } catch (error) {
     throw handleApiError(error);
   }
@@ -229,8 +309,8 @@ export const approveCompany = async (userId: string): Promise<User> => {
 // Firmayı reddet
 export const rejectCompany = async (userId: string, reason: string): Promise<User> => {
   try {
-    const response = await api.put(`/auth/companies/${userId}/reject`, { reason });
-    return response.data;
+    const response = await apiRequest<{ user: User }>('put', `/auth/companies/${userId}/reject`, { reason });
+    return response.user;
   } catch (error) {
     throw handleApiError(error);
   }

@@ -282,8 +282,8 @@ const CreateListingScreen: React.FC<CreateListingScreenProps> = ({ navigation })
       setExpiryDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
       setItems([]);
       
-      // Ana ekrana yönlendir
-      navigation.navigate('Main');
+      // AllListings sayfasına yönlendir
+      navigation.navigate('AllListings');
     } catch (error: any) {
       console.error('İlan oluşturma hatası:', error);
       

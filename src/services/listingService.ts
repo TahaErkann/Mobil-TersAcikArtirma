@@ -201,9 +201,9 @@ export const getListingById = async (id: string, includeFullDetails: boolean = f
 /**
  * Kullanıcının kendi ilanlarını getir
  */
-export const getMyListings = async (): Promise<Listing[]> => {
+export const getMyListings = async (): Promise<any[]> => {
   try {
-    const response = await api.get('/listings/my-listings');
+    const response = await api.get('/listings/user/mylistings');
     return response.data;
   } catch (error) {
     console.error('Kullanıcı ilanları hatası:', error);
@@ -214,9 +214,12 @@ export const getMyListings = async (): Promise<Listing[]> => {
 /**
  * Kullanıcının verdiği teklifleri getir
  */
-export const getMyBids = async (): Promise<Bid[]> => {
+export const getMyBids = async (): Promise<any[]> => {
   try {
-    const response = await api.get('/bids/my-bids');
+    console.log('getMyBids service: API isteği gönderiliyor...');
+    const response = await api.get('/listings/user/mybids');
+    console.log('getMyBids service: API yanıtı alındı:', response.status);
+    console.log('getMyBids service: Yanıt verisi:', response.data);
     return response.data;
   } catch (error) {
     console.error('Kullanıcı teklifleri hatası:', error);

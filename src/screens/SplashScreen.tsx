@@ -1,12 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
 
-const SplashScreen = ({ navigateTo }) => {
+interface SplashScreenProps {
+  navigateTo: (screen: string) => void;
+}
+
+const SplashScreen: React.FC<SplashScreenProps> = ({ navigateTo }) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Image 
-          source={require('../../assets/icon.png')}
+          source={require('../../assets/logo.png')}
           style={styles.logo}
           resizeMode="contain"
         />

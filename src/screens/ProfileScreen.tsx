@@ -1,24 +1,51 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, TextInput, Button, Avatar, Card, Title, Paragraph, Divider, Chip, Surface, HelperText } from 'react-native-paper';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { Text, TextInput, Button, Avatar, Card, Title, Paragraph, Divider, Chip, Surface, HelperText, IconButton } from 'react-native-paper';
 import { useAuth } from '../hooks/useAuth';
 import { updateProfile } from '../services/authService';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
 
-const ProfileScreen = () => {
+interface ProfileScreenProps {
+  navigation?: NativeStackNavigationProp<any>;
+}
+
+const ProfileScreen: React.FC<ProfileScreenProps> = () => {
   const { user, updateUser, logout } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<any>>();
 
   const [formData, setFormData] = useState({
-    companyName: user?.companyInfo?.companyName || '',
-    address: user?.companyInfo?.address || '',
-    city: user?.companyInfo?.city || '',
-    phone: user?.companyInfo?.phone || '',
-    taxNumber: user?.companyInfo?.taxNumber || '',
-    description: user?.companyInfo?.description || ''
+    companyName: '',
+    address: '',
+    city: '',
+    phone: '',
+    taxNumber: '',
+    description: ''
   });
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Kullanıcı bilgileri değiştiğinde form verilerini güncelle
+  useEffect(() => {
+    if (user) {
+      console.log('ProfileScreen: User değişti, form güncelleniyor:', user);
+      console.log('ProfileScreen: User companyInfo:', user.companyInfo);
+      
+      // CompanyInfo undefined veya null ise default değerleri kullan
+      const companyInfo = user.companyInfo || {};
+      
+      setFormData({
+        companyName: companyInfo.companyName || '',
+        address: companyInfo.address || '',
+        city: companyInfo.city || '',
+        phone: companyInfo.phone || '',
+        taxNumber: companyInfo.taxNumber || '',
+        description: companyInfo.description || ''
+      });
+    }
+  }, [user]);
 
   const handleChange = (name: string, value: string) => {
     setFormData(prev => ({
@@ -32,13 +59,18 @@ const ProfileScreen = () => {
     setError(null);
     
     try {
+      console.log('Form verileri gönderiliyor:', formData);
       const updatedUser = await updateProfile(formData);
+      console.log('Backend\'den dönen güncellenmiş user:', updatedUser);
+      
       updateUser(updatedUser);
       setSuccess(true);
       
       // Onay beklemedeyse bilgi mesajı göster
       if (!updatedUser.isApproved && !updatedUser.isRejected) {
         setError('Firma bilgileriniz kaydedildi. Admin onayı bekleniyor.');
+      } else {
+        setError(null);
       }
       
       setTimeout(() => {
@@ -46,7 +78,7 @@ const ProfileScreen = () => {
       }, 3000);
     } catch (err) {
       setError('Bir hata oluştu. Lütfen tekrar deneyin.');
-      console.error(err);
+      console.error('Profil kaydetme hatası:', err);
     } finally {
       setLoading(false);
     }
@@ -78,7 +110,7 @@ const ProfileScreen = () => {
             <Avatar.Text 
               size={80} 
               label={user.name.substring(0, 1)} 
-              backgroundColor="#4F46E5"
+              style={{ backgroundColor: "#4F46E5" }}
             />
           )}
           <View style={styles.profileInfo}>
@@ -124,6 +156,45 @@ const ProfileScreen = () => {
             <Paragraph style={styles.rejectionHelp}>
               Lütfen bilgilerinizi güncelleyip tekrar başvurunuz.
             </Paragraph>
+          </Card.Content>
+        </Card>
+      )}
+
+      {user.isApproved && (
+        <Card style={styles.menuCard}>
+          <Card.Content>
+            <Title style={styles.sectionTitle}>Hızlı Erişim</Title>
+            <Divider style={styles.divider} />
+            
+            <View style={styles.menuContainer}>
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => navigation.navigate('MyListings')}
+              >
+                <View style={styles.menuIconContainer}>
+                  <IconButton icon="format-list-bulleted" size={24} iconColor="white" />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuTitle}>İlanlarım</Text>
+                  <Text style={styles.menuSubtitle}>Oluşturduğunuz ilanları görüntüleyin</Text>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.menuItem}
+                onPress={() => navigation.navigate('MyBids')}
+              >
+                <View style={styles.menuIconContainer}>
+                  <IconButton icon="gavel" size={24} iconColor="white" />
+                </View>
+                <View style={styles.menuTextContainer}>
+                  <Text style={styles.menuTitle}>Tekliflerim</Text>
+                  <Text style={styles.menuSubtitle}>Verdiğiniz teklifleri takip edin</Text>
+                </View>
+                <IconButton icon="chevron-right" size={20} iconColor="#9CA3AF" />
+              </TouchableOpacity>
+            </View>
           </Card.Content>
         </Card>
       )}
@@ -336,6 +407,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     fontSize: 16,
+  },
+  menuCard: {
+    marginBottom: 16,
+  },
+  menuContainer: {
+    gap: 12,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  menuIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  menuTextContainer: {
+    flex: 1,
+  },
+  menuTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  menuSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
   },
 });
 

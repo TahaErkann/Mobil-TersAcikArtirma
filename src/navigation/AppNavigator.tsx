@@ -18,6 +18,8 @@ import WelcomeScreen from '../screens/WelcomeScreen';
 import CreateListingScreen from '../screens/CreateListingScreen';
 import AllListingsScreen from '../screens/AllListingsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import MyListingsScreen from '../screens/MyListingsScreen';
+import MyBidsScreen from '../screens/MyBidsScreen';
 
 // Admin Ekranları
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
@@ -260,6 +262,16 @@ const MainStack = () => (
       name="Notifications"
       component={NotificationsScreen}
       options={{ title: 'Bildirimler' }}
+    />
+    <Stack.Screen
+      name="MyListings"
+      component={MyListingsScreen}
+      options={{ title: 'İlanlarım' }}
+    />
+    <Stack.Screen
+      name="MyBids"
+      component={MyBidsScreen}
+      options={{ title: 'Tekliflerim' }}
     />
   </Stack.Navigator>
 );

@@ -1,330 +1,691 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, TextInput, ActivityIndicator, Modal, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { getAllCategories, createCategory, updateCategory, deleteCategory, toggleCategoryStatus } from '../services/categoryService';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Image } from 'react-native';
+import { Text, Card, Button, TextInput, FAB, Dialog, Portal, Paragraph, IconButton, ActivityIndicator, Snackbar, Avatar, Menu, Divider } from 'react-native-paper';
+import * as ImagePicker from 'expo-image-picker';
+import { getAllCategories, createCategory, updateCategory, deleteCategory } from '../services/categoryService';
 import { Category } from '../types';
+import { useAuth } from '../hooks/useAuth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const AdminCategoriesScreen = () => {
+  const { user } = useAuth();
   const [categories, setCategories] = useState<Category[]>([]);
-  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
+  const [visible, setVisible] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
-  const [categoryName, setCategoryName] = useState('');
-  const [categoryDescription, setCategoryDescription] = useState('');
+  const [currentCategory, setCurrentCategory] = useState<Partial<Category>>({
+    name: '',
+    description: '',
+    icon: '',
+    image: '',
+    isActive: true
+  });
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  // Resim ekleme formu için state'ler
+  const [imageUploadVisible, setImageUploadVisible] = useState(false);
+  const [selectedCategoryForImage, setSelectedCategoryForImage] = useState<string>('');
+  const [imageForUpload, setImageForUpload] = useState<string | null>(null);
+  const [categoryMenuVisible, setCategoryMenuVisible] = useState(false);
 
   // Kategorileri yükle
   const loadCategories = async () => {
     try {
       setLoading(true);
-      const response = await getAllCategories();
-      setCategories(response);
-      filterCategories(response, searchQuery);
-    } catch (error: any) {
-      Alert.alert('Hata', error.message || 'Kategoriler yüklenirken bir hata oluştu');
+      const data = await getAllCategories();
+      setCategories(data);
+    } catch (error) {
+      showSnackbar('Kategoriler yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // Yenileme işlemi
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  // Resim ekleme dialog'unu takip et
+  useEffect(() => {
+    console.log('🔥 imageUploadVisible değişti:', imageUploadVisible);
+    if (imageUploadVisible) {
+      console.log('🖼️ RESİM EKLEME DIALOG\'U AÇIK!');
+    } else {
+      console.log('🖼️ Resim ekleme dialog\'u kapalı');
+    }
+  }, [imageUploadVisible]);
+
   const onRefresh = () => {
     setRefreshing(true);
     loadCategories();
   };
 
-  // Başlangıçta kategorileri yükle
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  // Arama ve filtreleme
-  const filterCategories = (categoryList: Category[], query: string) => {
-    if (!query) {
-      setFilteredCategories(categoryList);
-      return;
-    }
-    
-    // Arama filtresi
-    const filtered = categoryList.filter(category => 
-      category.name.toLowerCase().includes(query.toLowerCase()) || 
-      (category.description && category.description.toLowerCase().includes(query.toLowerCase()))
-    );
-    
-    setFilteredCategories(filtered);
+  const showDialog = () => {
+    setVisible(true);
   };
 
-  useEffect(() => {
-    filterCategories(categories, searchQuery);
-  }, [searchQuery]);
-
-  // Kategori ekle modalı aç
-  const openAddModal = () => {
+  const hideDialog = () => {
+    setVisible(false);
     setEditMode(false);
-    setCurrentCategory(null);
-    setCategoryName('');
-    setCategoryDescription('');
-    setModalVisible(true);
+    setCurrentCategory({
+      name: '',
+      description: '',
+      icon: '',
+      image: '',
+      isActive: true
+    });
   };
 
-  // Kategori düzenle modalı aç
-  const openEditModal = (category: Category) => {
-    setEditMode(true);
+  const handleEdit = (category: Category) => {
     setCurrentCategory(category);
-    setCategoryName(category.name);
-    setCategoryDescription(category.description || '');
-    setModalVisible(true);
+    setEditMode(true);
+    showDialog();
   };
 
-  // Kategori kaydet
-  const handleSaveCategory = async () => {
-    if (!categoryName.trim()) {
-      Alert.alert('Hata', 'Kategori adı boş olamaz');
+  const handleDeleteConfirm = (category: Category) => {
+    setCategoryToDelete(category);
+    setDeleteDialogVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!categoryToDelete) return;
+    
+    try {
+      await deleteCategory(categoryToDelete._id);
+      showSnackbar('Kategori başarıyla silindi.');
+      setCategories(categories.filter(c => c._id !== categoryToDelete._id));
+    } catch (error) {
+      showSnackbar('Kategori silinirken bir hata oluştu.');
+    } finally {
+      setDeleteDialogVisible(false);
+      setCategoryToDelete(null);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      if (!currentCategory.name) {
+        return showSnackbar('Kategori adı zorunludur.');
+      }
+
+      const formData = new FormData();
+      formData.append('name', currentCategory.name);
+      formData.append('description', currentCategory.description || '');
+      formData.append('icon', currentCategory.icon || '');
+      formData.append('isActive', currentCategory.isActive ? 'true' : 'false');
+
+      const token = await AsyncStorage.getItem('token');
+      const apiUrl = 'http://192.168.254.112:5001';
+
+      if (editMode && currentCategory._id) {
+        const url = `${apiUrl}/api/categories/${currentCategory._id}`;
+        
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Güncelleme başarısız: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.category) {
+          setCategories(
+            categories.map(c => (c._id === result.category._id ? result.category : c))
+          );
+          showSnackbar('Kategori başarıyla güncellendi.');
+        }
+      } else {
+        const url = `${apiUrl}/api/categories`;
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Ekleme başarısız: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.category) {
+          setCategories([...categories, result.category]);
+          showSnackbar('Kategori başarıyla eklendi.');
+        }
+      }
+      hideDialog();
+      loadCategories();
+    } catch (error) {
+      console.error('handleSave error:', error);
+      showSnackbar(editMode ? 'Güncelleme sırasında hata oluştu.' : 'Ekleme sırasında hata oluştu.');
+    }
+  };
+
+  const showSnackbar = (message: string) => {
+    setSnackbarMessage(message);
+    setSnackbarVisible(true);
+  };
+
+  // Resim ekleme formunu aç
+  const openImageUploadForm = () => {
+    console.log('🚨 RESİM EKLEME FORMU AÇILIYOR!');
+    console.log('Önceki imageUploadVisible:', imageUploadVisible);
+    setImageUploadVisible(true);
+    setSelectedCategoryForImage('');
+    setImageForUpload(null);
+    console.log('Yeni imageUploadVisible: true');
+  };
+
+  // Resim ekleme formunu kapat
+  const closeImageUploadForm = () => {
+    console.log('Resim ekleme formu kapatılıyor...');
+    setImageUploadVisible(false);
+    setSelectedCategoryForImage('');
+    setImageForUpload(null);
+  };
+
+  // Kategoriye resim yükleme için resim seç
+  const pickImageForCategory = async () => {
+    console.log('Kategoriye resim seçme fonksiyonu çağrıldı');
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    
+    if (permissionResult.granted === false) {
+      Alert.alert('İzin Gerekli', 'Resim seçmek için galeri erişim izni gereklidir.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      console.log('Resim seçildi:', result.assets[0].uri);
+      setImageForUpload(result.assets[0].uri);
+    }
+  };
+
+  // Kategoriye resim yükle
+  const uploadImageToCategory = async () => {
+    if (!selectedCategoryForImage || !imageForUpload) {
+      showSnackbar('Lütfen kategori seçin ve resim ekleyin.');
       return;
     }
 
     try {
-      setLoading(true);
-      
-      if (editMode && currentCategory) {
-        // Kategori güncelle
-        await updateCategory(currentCategory._id, {
-          name: categoryName,
-          description: categoryDescription
-        });
-        Alert.alert('Başarılı', `${categoryName} kategorisi güncellendi`);
-      } else {
-        // Yeni kategori ekle
-        await createCategory({
-          name: categoryName,
-          description: categoryDescription
-        });
-        Alert.alert('Başarılı', `${categoryName} kategorisi eklendi`);
-      }
-      
-      setModalVisible(false);
-      loadCategories();
-    } catch (error: any) {
-      Alert.alert(
-        'Hata', 
-        error.message || (editMode ? 'Kategori güncellenirken bir hata oluştu' : 'Kategori eklenirken bir hata oluştu')
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+      console.log('🚀 Resim yükleme başlıyor...');
+      console.log('📋 Seçilen kategori ID:', selectedCategoryForImage);
+      console.log('🖼️ Resim URI:', imageForUpload);
 
-  // Kategori sil
-  const handleDeleteCategory = async (category: Category) => {
-    Alert.alert(
-      'Kategoriyi Sil',
-      `"${category.name}" kategorisini silmek istediğinizden emin misiniz?`,
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              await deleteCategory(category._id);
-              Alert.alert('Başarılı', `${category.name} kategorisi silindi`);
-              loadCategories();
-            } catch (error: any) {
-              Alert.alert('Hata', error.message || 'Kategori silinirken bir hata oluştu');
-            } finally {
-              setLoading(false);
-            }
-          },
+      const formData = new FormData();
+      
+      const imageUri = imageForUpload;
+      const filename = imageUri.split('/').pop() || 'image.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+      console.log('📁 Dosya bilgileri:', { filename, type });
+
+      formData.append('image', {
+        uri: imageUri,
+        name: filename,
+        type,
+      } as any);
+
+      const token = await AsyncStorage.getItem('token');
+      console.log('🔑 Token alındı:', token ? `Var (${token.substring(0, 20)}...)` : 'YOK!');
+
+      // API base URL'ini dinamik olarak al
+      const apiBaseUrl = 'http://192.168.254.112:5001';
+      const url = `${apiBaseUrl}/api/categories/${selectedCategoryForImage}`;
+      
+      console.log('🌐 API URL:', url);
+      console.log('📤 FormData içeriği:', {
+        imageUri,
+        filename,
+        type,
+        hasToken: !!token
+      });
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
         },
-      ]
-    );
-  };
+        body: formData,
+      });
 
-  // Kategori durumunu değiştir (aktif/pasif)
-  const handleToggleCategoryStatus = async (category: Category) => {
-    try {
-      setLoading(true);
-      await toggleCategoryStatus(category._id);
+      console.log('📥 API yanıt durumu:', response.status);
+      console.log('📥 API yanıt headers:', response.headers);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API hata yanıtı:', errorText);
+        console.error('❌ Hata durumu:', response.status);
+        console.error('❌ Hata statusText:', response.statusText);
+        throw new Error(`Resim yükleme başarısız: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ API başarılı yanıt:', result);
       
-      const statusText = category.isActive ? 'pasif' : 'aktif';
-      Alert.alert('Başarılı', `${category.name} kategorisi ${statusText} duruma getirildi`);
-      
-      loadCategories();
+      if (result.category) {
+        setCategories(
+          categories.map(c => (c._id === result.category._id ? result.category : c))
+        );
+        showSnackbar('Kategori resmi başarıyla güncellendi.');
+        closeImageUploadForm();
+        loadCategories();
+      }
     } catch (error: any) {
-      Alert.alert('Hata', error.message || 'Kategori durumu değiştirilirken bir hata oluştu');
-    } finally {
-      setLoading(false);
+      console.error('💥 Resim yükleme hatası:', error);
+      console.error('💥 Hata detayları:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      
+      // Network hatası mı kontrol et
+      if (error.message.includes('Network request failed')) {
+        showSnackbar('Ağ bağlantısı hatası. İnternet bağlantınızı kontrol edin.');
+      } else {
+        showSnackbar('Resim yüklenirken hata oluştu: ' + error.message);
+      }
     }
   };
 
-  // Kategori öğesi
-  const renderCategoryItem = ({ item }: { item: Category }) => (
-    <View style={[
-      styles.categoryItem, 
-      { borderLeftColor: item.isActive ? '#4ade80' : '#9ca3af', borderLeftWidth: 4 }
-    ]}>
-      <View style={styles.categoryInfo}>
-        <Text style={styles.categoryName}>{item.name}</Text>
-        {item.description && (
-          <Text style={styles.categoryDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-        )}
-        <View style={[
-          styles.statusBadge, 
-          { backgroundColor: item.isActive ? '#4ade80' : '#9ca3af' }
-        ]}>
-          <Text style={styles.statusText}>
-            {item.isActive ? 'Aktif' : 'Pasif'}
-          </Text>
-        </View>
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+        <Text style={styles.loadingText}>Kategoriler yükleniyor...</Text>
       </View>
-      
-      <View style={styles.actions}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.editButton]}
-          onPress={() => openEditModal(item)}
-        >
-          <Ionicons name="pencil" size={18} color="white" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.toggleButton]}
-          onPress={() => handleToggleCategoryStatus(item)}
-        >
-          <Ionicons 
-            name={item.isActive ? 'eye-off' : 'eye'} 
-            size={18} 
-            color="white" 
-          />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => handleDeleteCategory(item)}
-        >
-          <Ionicons name="trash" size={18} color="white" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  }
+
+  console.log('🔥 AdminCategoriesScreen render ediliyor...');
+  console.log('imageUploadVisible:', imageUploadVisible);
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Kategori Yönetimi</Text>
-      </View>
-      
-      <View style={styles.actionsBar}>
-        <View style={styles.searchContainer}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Kategori ara..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={openAddModal}
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
-      
-      {loading && !refreshing ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size={52} color="#4F46E5" />
-          <Text style={styles.loadingText}>Kategoriler yükleniyor...</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredCategories}
-          keyExtractor={(item) => item._id}
-          renderItem={renderCategoryItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#4F46E5']} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="folder-open" size={50} color="#d1d5db" />
-              <Text style={styles.emptyText}>Kategori bulunamadı</Text>
-            </View>
-          }
-        />
-      )}
-      
-      {/* Kategori Ekle/Düzenle Modalı */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editMode ? 'Kategori Düzenle' : 'Yeni Kategori Ekle'}
+        {/* MODERN RESİM EKLEME BUTONU */}
+        <Card style={styles.modernImageUploadCard}>
+          <LinearGradient
+            colors={['#667eea', '#764ba2']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gradientContainer}
+          >
+            <View style={styles.modernCardContent}>
+              <View style={styles.iconContainer}>
+                <View style={styles.iconCircle}>
+                  <Text style={styles.iconEmoji}>📷</Text>
+                </View>
+              </View>
+              
+              <Text style={styles.modernTitle}>
+                Kategori Resim Yönetimi
               </Text>
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setModalVisible(false)}
-              >
-                <Ionicons name="close" size={24} color="#4b5563" />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Kategori Adı</Text>
-              <TextInput
-                style={styles.input}
-                value={categoryName}
-                onChangeText={setCategoryName}
-                placeholder="Kategori adı girin"
-              />
-            </View>
-            
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Açıklama</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={categoryDescription}
-                onChangeText={setCategoryDescription}
-                placeholder="Açıklama girin (isteğe bağlı)"
-                multiline
-                numberOfLines={4}
-              />
-            </View>
-            
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.buttonText}>İptal</Text>
-              </TouchableOpacity>
+              
+              <Text style={styles.modernSubtitle}>
+                Kategorilerinize özel resimler ekleyerek daha görsel bir deneyim sunun
+              </Text>
+              
+              <View style={styles.featureList}>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>✨</Text>
+                  <Text style={styles.featureText}>Kolay resim yükleme</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>🎨</Text>
+                  <Text style={styles.featureText}>Otomatik boyutlandırma</Text>
+                </View>
+                <View style={styles.featureItem}>
+                  <Text style={styles.featureBullet}>⚡</Text>
+                  <Text style={styles.featureText}>Anında güncelleme</Text>
+                </View>
+              </View>
               
               <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveCategory}
+                style={styles.modernButton}
+                onPress={() => {
+                  console.log('🔥 Modern buton tıklandı!');
+                  openImageUploadForm();
+                }}
+                activeOpacity={0.8}
               >
-                <Text style={styles.buttonText}>Kaydet</Text>
+                <LinearGradient
+                  colors={['#ff6b6b', '#ee5a24']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.buttonGradient}
+                >
+                  <Text style={styles.buttonIcon}>🖼️</Text>
+                  <Text style={styles.buttonText}>Resim Yönetimi</Text>
+                  <Text style={styles.buttonArrow}>→</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+          </LinearGradient>
+        </Card>
+        
+        {categories.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Card.Content>
+              <Text style={styles.emptyText}>Henüz kategori bulunmamaktadır.</Text>
+            </Card.Content>
+          </Card>
+        ) : (
+          categories.map(category => (
+            <Card key={category._id} style={styles.card}>
+              <Card.Content>
+                <View style={styles.cardHeader}>
+                  <View style={styles.categoryInfo}>
+                    {category.image && (
+                      <Avatar.Image 
+                        size={40} 
+                        source={{ uri: `http://192.168.254.112:5001${category.image}` }} 
+                        style={styles.categoryImage}
+                      />
+                    )}
+                    <View style={styles.categoryTextInfo}>
+                      <Text style={styles.categoryName}>{category.name}</Text>
+                      {category.description && (
+                        <Text style={styles.description}>{category.description}</Text>
+                      )}
+                    </View>
+                  </View>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusText}>
+                      {category.isActive ? 'Aktif' : 'Pasif'}
+                    </Text>
+                  </View>
+                </View>
+              </Card.Content>
+              <Card.Actions>
+                <Button onPress={() => handleEdit(category)}>Düzenle</Button>
+                <Button 
+                  onPress={() => handleDeleteConfirm(category)}
+                  color="red"
+                >
+                  Sil
+                </Button>
+              </Card.Actions>
+            </Card>
+          ))
+        )}
+      </ScrollView>
+
+      <FAB
+        style={styles.fab}
+        icon="plus"
+        onPress={showDialog}
+        label="Yeni Kategori"
+      />
+
+      <Portal>
+        {/* Normal Kategori Ekleme/Düzenleme Dialog'u */}
+        <Dialog visible={visible} onDismiss={hideDialog} style={{ zIndex: 1000, maxHeight: '90%', margin: 10 }}>
+          <Dialog.Title style={{ fontSize: 20, fontWeight: 'bold', textAlign: 'center' }}>
+            {editMode ? '✏️ Kategori Düzenle' : '➕ Yeni Kategori Ekle'}
+          </Dialog.Title>
+          <Dialog.Content style={{ paddingBottom: 0, paddingTop: 10 }}>
+            <ScrollView 
+              showsVerticalScrollIndicator={true} 
+              style={{ maxHeight: 400 }} 
+              contentContainerStyle={{ paddingBottom: 20 }}
+            >
+              <TextInput
+                label="Kategori Adı *"
+                value={currentCategory.name}
+                onChangeText={text =>
+                  setCurrentCategory({ ...currentCategory, name: text })
+                }
+                style={styles.input}
+                mode="outlined"
+              />
+              
+              <TextInput
+                label="Açıklama"
+                value={currentCategory.description}
+                onChangeText={text =>
+                  setCurrentCategory({ ...currentCategory, description: text })
+                }
+                multiline
+                numberOfLines={3}
+                style={styles.input}
+                mode="outlined"
+              />
+              
+              <TextInput
+                label="İkon (FontAwesome ismi)"
+                value={currentCategory.icon}
+                onChangeText={text =>
+                  setCurrentCategory({ ...currentCategory, icon: text })
+                }
+                style={styles.input}
+                mode="outlined"
+              />
+
+              <View style={styles.switchContainer}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold' }}>Durum:</Text>
+                <View style={{ flexDirection: 'row', marginLeft: 10 }}>
+                  <Button
+                    mode={currentCategory.isActive ? "contained" : "outlined"}
+                    onPress={() => setCurrentCategory({ ...currentCategory, isActive: true })}
+                    style={[styles.switchButton, { marginRight: 8 }]}
+                    compact
+                  >
+                    Aktif
+                  </Button>
+                  <Button
+                    mode={!currentCategory.isActive ? "contained" : "outlined"}
+                    onPress={() => setCurrentCategory({ ...currentCategory, isActive: false })}
+                    style={styles.switchButton}
+                    compact
+                  >
+                    Pasif
+                  </Button>
+                </View>
+              </View>
+
+              <View style={{ marginTop: 20, padding: 15, backgroundColor: '#fff3cd', borderRadius: 10 }}>
+                <Text style={{ fontSize: 14, color: '#856404', textAlign: 'center', fontWeight: 'bold' }}>
+                  💡 İpucu: Kategoriye resim eklemek için ana sayfadaki "Resim Ekleme Formu" butonunu kullanın.
+                </Text>
+              </View>
+            </ScrollView>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={hideDialog}>İptal</Button>
+            <Button onPress={handleSave} mode="contained">Kaydet</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Kategori Silme Dialog'u */}
+        <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
+          <Dialog.Title>Kategori Sil</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph>
+              "{categoryToDelete?.name}" kategorisini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+            </Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setDeleteDialogVisible(false)}>İptal</Button>
+            <Button onPress={confirmDelete} color="red">Sil</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* RESİM EKLEME DIALOG'U */}
+        <Dialog 
+          visible={imageUploadVisible} 
+          onDismiss={closeImageUploadForm} 
+          style={{ 
+            zIndex: 2000, 
+            maxHeight: '95%', 
+            margin: 5,
+            backgroundColor: 'white'
+          }}
+        >
+          <Dialog.Title style={{ 
+            fontSize: 22, 
+            fontWeight: 'bold', 
+            textAlign: 'center', 
+            color: '#1565C0',
+            backgroundColor: '#e3f2fd',
+            padding: 15,
+            margin: -24,
+            marginBottom: 10
+          }}>
+            📷 KATEGORİYE RESİM EKLE
+          </Dialog.Title>
+          <Dialog.Content style={{ paddingBottom: 0, paddingTop: 15 }}>
+            <ScrollView 
+              showsVerticalScrollIndicator={true} 
+              style={{ maxHeight: 600 }} 
+              contentContainerStyle={{ paddingBottom: 20 }}
+              nestedScrollEnabled={true}
+            >
+              {/* Kategori Seçimi */}
+              <View style={styles.categorySelectionSection}>
+                <Text style={styles.sectionTitle}>1️⃣ Kategori Seçin</Text>
+                <Menu
+                  visible={categoryMenuVisible}
+                  onDismiss={() => setCategoryMenuVisible(false)}
+                  anchor={
+                    <Button
+                      mode="outlined"
+                      onPress={() => setCategoryMenuVisible(true)}
+                      style={styles.categorySelectButton}
+                      contentStyle={{ height: 50 }}
+                      labelStyle={{ fontSize: 16 }}
+                    >
+                      {selectedCategoryForImage 
+                        ? categories.find(c => c._id === selectedCategoryForImage)?.name || 'Kategori Seç'
+                        : 'Kategori Seç'
+                      }
+                    </Button>
+                  }
+                >
+                  {categories.map((category) => (
+                    <Menu.Item
+                      key={category._id}
+                      onPress={() => {
+                        setSelectedCategoryForImage(category._id);
+                        setCategoryMenuVisible(false);
+                      }}
+                      title={category.name}
+                    />
+                  ))}
+                </Menu>
+              </View>
+
+              <Divider style={{ marginVertical: 20 }} />
+
+              {/* Resim Seçimi */}
+              <View style={styles.imageSelectionSection}>
+                <Text style={styles.sectionTitle}>2️⃣ Resim Seçin</Text>
+                <Button
+                  mode="contained"
+                  onPress={pickImageForCategory}
+                  icon="camera"
+                  style={[styles.imageSelectButton, { backgroundColor: '#4CAF50', elevation: 5 }]}
+                  labelStyle={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}
+                  contentStyle={{ height: 50 }}
+                >
+                  📸 Galeri'den Resim Seç
+                </Button>
+
+                {imageForUpload && (
+                  <View style={styles.selectedImagePreview}>
+                    <Avatar.Image 
+                      size={100} 
+                      source={{ uri: imageForUpload }} 
+                    />
+                    <Text style={{ marginTop: 8, color: '#4CAF50', fontWeight: 'bold', fontSize: 14 }}>
+                      ✅ Resim seçildi!
+                    </Text>
+                    <Button
+                      mode="outlined"
+                      onPress={() => setImageForUpload(null)}
+                      icon="delete"
+                      style={{ marginTop: 10 }}
+                      labelStyle={{ color: '#f44336' }}
+                    >
+                      Resmi Kaldır
+                    </Button>
+                  </View>
+                )}
+
+                {!imageForUpload && (
+                  <View style={styles.noImageSelected}>
+                    <Text style={{ fontSize: 14, color: '#666', textAlign: 'center' }}>
+                      🖼️ Henüz resim seçilmedi
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              <Divider style={{ marginVertical: 20 }} />
+
+              {/* Yükleme Butonu */}
+              <View style={styles.uploadSection}>
+                <Text style={styles.sectionTitle}>3️⃣ Resmi Yükle</Text>
+                <Button
+                  mode="contained"
+                  onPress={uploadImageToCategory}
+                  icon="upload"
+                  style={[styles.uploadButton, { 
+                    backgroundColor: selectedCategoryForImage && imageForUpload ? '#2196F3' : '#ccc',
+                    elevation: selectedCategoryForImage && imageForUpload ? 5 : 0
+                  }]}
+                  labelStyle={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}
+                  contentStyle={{ height: 55 }}
+                  disabled={!selectedCategoryForImage || !imageForUpload}
+                >
+                  🚀 Kategoriye Resim Yükle
+                </Button>
+              </View>
+            </ScrollView>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={closeImageUploadForm} mode="outlined">İptal</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+      >
+        {snackbarMessage}
+      </Snackbar>
     </View>
   );
 };
@@ -332,43 +693,10 @@ const AdminCategoriesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f5f5f5',
   },
-  header: {
+  scrollContent: {
     padding: 16,
-    backgroundColor: '#4F46E5',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
-    marginTop: 8,
-  },
-  actionsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  searchContainer: {
-    flex: 1,
-    marginRight: 8,
-  },
-  searchInput: {
-    height: 40,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#4F46E5',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -376,159 +704,210 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 8,
-    color: '#6b7280',
+    marginTop: 10,
   },
-  listContent: {
-    padding: 8,
-  },
-  categoryItem: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    marginVertical: 4,
-    borderRadius: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+  card: {
+    marginBottom: 16,
     elevation: 2,
   },
-  categoryInfo: {
-    flex: 1,
-  },
-  categoryName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  categoryDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 4,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginTop: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 8,
-  },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  editButton: {
-    backgroundColor: '#4F46E5',
-  },
-  toggleButton: {
-    backgroundColor: '#3b82f6',
-  },
-  deleteButton: {
-    backgroundColor: '#ef4444',
-  },
-  emptyContainer: {
-    paddingVertical: 48,
-    alignItems: 'center',
-  },
-  emptyText: {
-    marginTop: 8,
-    fontSize: 16,
-    color: '#9ca3af',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '85%',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalHeader: {
+  cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  formGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#4b5563',
     marginBottom: 8,
   },
-  input: {
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  modalActions: {
+  categoryInfo: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
-  },
-  modalButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    minWidth: 80,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#f3f4f6',
+  categoryTextInfo: {
+    marginLeft: 8,
+  },
+  categoryName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  description: {
+    color: '#666',
+  },
+  statusBadge: {
+    backgroundColor: '#e0e0e0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+  },
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
+  },
+  input: {
+    marginBottom: 12,
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  switchButton: {
+    marginLeft: 8,
+  },
+  emptyCard: {
+    marginVertical: 20,
+    padding: 10,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  categoryImage: {
     marginRight: 8,
   },
-  saveButton: {
-    backgroundColor: '#4F46E5',
+  categorySelectionSection: {
+    marginBottom: 20,
   },
-  buttonText: {
-    fontSize: 14,
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#1565C0',
+  },
+  categorySelectButton: {
+    marginBottom: 10,
+    borderColor: '#2196F3',
+    borderWidth: 2,
+  },
+  imageSelectionSection: {
+    marginBottom: 20,
+  },
+  imageSelectButton: {
+    marginBottom: 10,
+  },
+  selectedImagePreview: {
+    marginTop: 12,
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#f0f8f0',
+    borderRadius: 10,
+  },
+  noImageSelected: {
+    marginTop: 12,
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+  },
+  uploadSection: {
+    marginBottom: 20,
+  },
+  uploadButton: {
+    marginBottom: 10,
+  },
+  modernImageUploadCard: {
+    marginBottom: 20,
+    borderRadius: 16,
+    elevation: 8,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    overflow: 'hidden',
+  },
+  gradientContainer: {
+    borderRadius: 16,
+    padding: 20,
+  },
+  modernCardContent: {
+    alignItems: 'center',
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  iconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  iconEmoji: {
+    fontSize: 28,
+  },
+  modernTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modernSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  featureList: {
+    marginBottom: 24,
+    width: '100%',
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
+  featureBullet: {
+    fontSize: 16,
+    marginRight: 12,
+  },
+  featureText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    flex: 1,
+  },
+  modernButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowColor: '#ff6b6b',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  buttonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    minWidth: 250,
+  },
+  buttonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  buttonArrow: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginLeft: 8,
   },
 });
 

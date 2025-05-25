@@ -28,9 +28,10 @@ interface AuthContextProps {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string) => Promise<{ success: boolean; user?: User; token?: string; error?: string }>;
   logout: () => Promise<void>;
   clearError: () => void;
+  updateUser: (updatedUser: User) => void;
 }
 
 // Başlangıç durumu
@@ -88,9 +89,10 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
 export const AuthContext = createContext<AuthContextProps>({
   ...initialState,
   login: async () => {},
-  register: async () => {},
+  register: async () => ({ success: false, error: 'Not implemented' }),
   logout: async () => {},
   clearError: () => {},
+  updateUser: () => {},
 });
 
 // Provider bileşeni
@@ -109,15 +111,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isAuth) {
           try {
             // Kullanıcı bilgilerini al
+            console.log('AuthContext: Kullanıcı bilgileri alınıyor...');
             const user = await authService.getCurrentUser();
             const token = await AsyncStorage.getItem('token');
+            
+            console.log('AuthContext: Alınan kullanıcı bilgileri:', user);
             
             dispatch({
               type: 'LOGIN_SUCCESS',
               payload: { user, token: token || '' },
             });
           } catch (userError) {
-            console.error('Kullanıcı bilgileri alınamadı:', userError);
+            console.error('Kullanıcı bilgisi alınamadı:', userError);
             // Kullanıcı bilgisi alınamadıysa sessiz kalmak yerine
             // token'ı temizle ve kullanıcı oturumunu kapat
             await AsyncStorage.removeItem('token');
@@ -179,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Register fonksiyonu
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (name: string, email: string, password: string): Promise<{ success: boolean; user?: User; token?: string; error?: string }> => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'CLEAR_ERROR' }); // Önceki hataları temizle
@@ -195,6 +200,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         type: 'REGISTER_SUCCESS',
         payload: data,
       });
+      
+      return { success: true, user: data.user, token: data.token };
     } catch (error: any) {
       console.error('Kayıt başarısız:', error);
       
@@ -215,6 +222,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         type: 'AUTH_ERROR',
         payload: errorMessage,
       });
+      
+      return { success: false, error: errorMessage };
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -233,6 +242,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Hata temizleme
   const clearError = () => {
     dispatch({ type: 'CLEAR_ERROR' });
+  };
+
+  // Kullanıcı bilgilerini güncelle
+  const updateUser = (updatedUser: User) => {
+    console.log('AuthContext: updateUser çağrıldı, yeni user:', updatedUser);
+    dispatch({
+      type: 'LOGIN_SUCCESS',
+      payload: { user: updatedUser, token: state.token || '' }
+    });
+    console.log('AuthContext: User state güncellendi');
   };
 
   // Yükleme durumunda ekranda gösterilecek içerik
@@ -260,6 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         register,
         logout,
         clearError,
+        updateUser,
       }}
     >
       {children}

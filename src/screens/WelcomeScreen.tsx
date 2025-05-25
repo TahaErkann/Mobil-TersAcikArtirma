@@ -1,9 +1,18 @@
-import React from 'react';
-import { View, StyleSheet, Image, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
-import { Text, Button, Title, Card, ActivityIndicator } from 'react-native-paper';
+import React, { useEffect, useRef } from 'react';
+import { 
+  View, 
+  StyleSheet, 
+  Image, 
+  ScrollView, 
+  Dimensions, 
+  TouchableOpacity,
+  Animated,
+  StatusBar
+} from 'react-native';
+import { Text, Button, Title, Card, Surface, IconButton } from 'react-native-paper';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 // Props tipi tanımla
 interface WelcomeScreenProps {
@@ -12,243 +21,608 @@ interface WelcomeScreenProps {
 
 // Ana Sayfa ekranı
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation }) => {
-  return (
-    <ScrollView style={styles.container}>
-      {/* Header Bölümü */}
-      <View style={styles.header}>
-        <Image 
-          source={require('../../assets/icon.png')} 
-          style={styles.logo} 
-          resizeMode="contain"
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+
+  useEffect(() => {
+    // Sayfa yükleme animasyonu
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const renderFeatureCard = (icon: string, title: string, description: string, color: string) => (
+    <Surface style={[styles.featureCard, { backgroundColor: color }]} elevation={5}>
+      <View style={styles.featureIconContainer}>
+        <IconButton 
+          icon={icon} 
+          size={32} 
+          iconColor="white"
+          style={styles.featureIcon}
         />
-        <Title style={styles.title}>Ters Açık Artırma</Title>
-        <Text style={styles.subtitle}>İşletmeler İçin En Düşük Fiyat Platformu</Text>
       </View>
+      <Text style={styles.featureTitle}>{title}</Text>
+      <Text style={styles.featureText}>{description}</Text>
+    </Surface>
+  );
 
-      {/* Giriş ve Kayıt Butonları */}
-      <View style={styles.buttonContainer}>
-        <Button 
-          mode="contained" 
-          style={styles.button}
-          onPress={() => navigation.navigate('Login')}
-        >
-          Giriş Yap
-        </Button>
-        <Button 
-          mode="outlined" 
-          style={styles.button}
-          onPress={() => navigation.navigate('Register')}
-        >
-          Kayıt Ol
-        </Button>
+  const renderStepCard = (number: string, title: string, description: string, icon: string) => (
+    <Surface style={styles.stepCard} elevation={3}>
+      <View style={styles.stepIconContainer}>
+        <View style={styles.stepNumberGradient}>
+          <Text style={styles.stepNumberText}>{number}</Text>
+        </View>
+        <IconButton 
+          icon={icon} 
+          size={24} 
+          iconColor="#667eea"
+          style={styles.stepIcon}
+        />
       </View>
-
-      {/* Uygulama Tanıtımı */}
-      <View style={styles.infoSection}>
-        <Title style={styles.sectionTitle}>Ters Açık Artırma Nedir?</Title>
-        <Text style={styles.paragraph}>
-          Geleneksel açık artırmalarda, alıcılar fiyatı yükseltmek için yarışır. 
-          Ters açık artırmada ise satıcılar, en düşük fiyatı sunmak için rekabet eder.
-        </Text>
-        <Text style={styles.paragraph}>
-          İşletmeler için tedarik maliyetlerini düşürmek ve rekabetçi fiyatlar elde 
-          etmek için ideal bir platformdur.
-        </Text>
+      <View style={styles.stepContent}>
+        <Text style={styles.stepTitle}>{title}</Text>
+        <Text style={styles.stepText}>{description}</Text>
       </View>
+    </Surface>
+  );
 
-      {/* Özellikler */}
-      <Title style={styles.sectionTitle}>Özellikler</Title>
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#4F46E5" />
       
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.featuresContainer}
-      >
-        <Card style={styles.featureCard}>
-          <Card.Content>
-            <Title style={styles.featureTitle}>Gerçek Zamanlı Teklifler</Title>
-            <Text style={styles.featureText}>
-              Teklifleri anında görün ve rekabete hemen katılın.
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Animated.View 
+            style={[
+              styles.heroContent,
+              {
+                opacity: fadeAnim,
+                transform: [
+                  { translateY: slideAnim },
+                  { scale: scaleAnim }
+                ]
+              }
+            ]}
+          >
+            <View style={styles.logoContainer}>
+              <Image 
+                source={require('../../assets/logo.png')} 
+                style={styles.logo} 
+                resizeMode="contain"
+              />
+              <View style={styles.logoGlow} />
+            </View>
+            
+            <Text style={styles.heroTitle}>Ters Açık Artırma</Text>
+            <Text style={styles.heroSubtitle}>
+              İşletmeler İçin En Düşük Fiyat Platformu
             </Text>
-          </Card.Content>
-        </Card>
+            <Text style={styles.heroDescription}>
+              Tedarik maliyetlerinizi düşürün, rekabetçi fiyatlar elde edin
+            </Text>
+            
+            {/* Action Buttons */}
+            <View style={styles.heroButtons}>
+              <TouchableOpacity 
+                style={styles.primaryButton}
+                onPress={() => navigation.navigate('Register')}
+                activeOpacity={0.8}
+              >
+                <View style={styles.buttonGradient}>
+                  <Text style={styles.primaryButtonText}>Ücretsiz Başlayın</Text>
+                </View>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.secondaryButton}
+                onPress={() => navigation.navigate('Login')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.secondaryButtonText}>Giriş Yap</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+          
+          {/* Floating Elements */}
+          <View style={styles.floatingElement1} />
+          <View style={styles.floatingElement2} />
+          <View style={styles.floatingElement3} />
+        </View>
 
-        <Card style={styles.featureCard}>
-          <Card.Content>
-            <Title style={styles.featureTitle}>Kategori Bazlı Arama</Title>
-            <Text style={styles.featureText}>
-              İhtiyacınız olan ürünleri kategorilere göre kolayca bulun.
-            </Text>
-          </Card.Content>
-        </Card>
+        {/* Features Section */}
+        <View style={styles.featuresSection}>
+          <Text style={styles.sectionTitle}>Neden Bizimle Çalışın?</Text>
+          <Text style={styles.sectionSubtitle}>
+            Modern teknoloji ile geleneksel ticaretin gücünü birleştiriyoruz
+          </Text>
+          
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.featuresContainer}
+            contentContainerStyle={styles.featuresContent}
+          >
+            {renderFeatureCard(
+              'flash', 
+              'Gerçek Zamanlı', 
+              'Anlık teklifler ve canlı güncellemeler',
+              '#FF6B6B'
+            )}
+            {renderFeatureCard(
+              'shield-check', 
+              'Güvenli İşlemler', 
+              'SSL şifrelemesi ve güvenli ödeme',
+              '#4ECDC4'
+            )}
+            {renderFeatureCard(
+              'chart-line', 
+              'Rekabetçi Fiyat', 
+              'En düşük fiyatları garantiliyoruz',
+              '#45B7D1'
+            )}
+            {renderFeatureCard(
+              'account-group', 
+              'Geniş Ağ', 
+              'Binlerce tedarikçi ve alıcı',
+              '#96CEB4'
+            )}
+          </ScrollView>
+        </View>
 
-        <Card style={styles.featureCard}>
-          <Card.Content>
-            <Title style={styles.featureTitle}>Güvenli Ödeme</Title>
-            <Text style={styles.featureText}>
-              Güvenli işlem garantisi ile alışverişlerinizi gerçekleştirin.
+        {/* How It Works Section */}
+        <View style={styles.howItWorksSection}>
+          <Text style={styles.sectionTitle}>Nasıl Çalışır?</Text>
+          <Text style={styles.sectionSubtitle}>
+            3 basit adımda işinizi büyütmeye başlayın
+          </Text>
+          
+          <View style={styles.stepsContainer}>
+            {renderStepCard(
+              '1',
+              'Hızlı Kayıt',
+              'Dakikalar içinde hesabınızı oluşturun ve onay alın',
+              'account-plus'
+            )}
+            
+            {renderStepCard(
+              '2',
+              'İhtiyaçlarınızı Belirtin',
+              'Aradığınız ürün/hizmeti detaylandırın',
+              'clipboard-search'
+            )}
+            
+            {renderStepCard(
+              '3',
+              'En İyi Teklifi Alın',
+              'Tedarikçiler yarışsın, siz kazanın',
+              'trophy'
+            )}
+          </View>
+        </View>
+
+        {/* Stats Section */}
+        <View style={styles.statsSection}>
+          <View style={styles.statsGradient}>
+            <Text style={styles.statsTitle}>Platform İstatistikleri</Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>10K+</Text>
+                <Text style={styles.statLabel}>Aktif Kullanıcı</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>500+</Text>
+                <Text style={styles.statLabel}>Tamamlanan İş</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>%35</Text>
+                <Text style={styles.statLabel}>Ortalama Tasarruf</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Call to Action */}
+        <View style={styles.ctaSection}>
+          <Text style={styles.ctaTitle}>Hemen Başlamaya Hazır mısınız?</Text>
+          <Text style={styles.ctaSubtitle}>
+            Binlerce firma tercih ediyor, siz de katılın!
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.ctaButton}
+            onPress={() => navigation.navigate('Register')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.ctaButtonGradient}>
+              <IconButton icon="rocket-launch" size={24} iconColor="white" />
+              <Text style={styles.ctaButtonText}>Ücretsiz Hesap Oluştur</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+            <Text style={styles.loginLink}>
+              Zaten hesabınız var mı? <Text style={styles.loginLinkBold}>Giriş Yapın</Text>
             </Text>
-          </Card.Content>
-        </Card>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-
-      {/* Nasıl Çalışır */}
-      <View style={styles.infoSection}>
-        <Title style={styles.sectionTitle}>Nasıl Çalışır?</Title>
-        
-        <View style={styles.stepContainer}>
-          <View style={styles.stepNumber}>
-            <Text style={styles.stepNumberText}>1</Text>
-          </View>
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Kayıt Olun</Text>
-            <Text style={styles.stepText}>Hızlıca hesap oluşturun ve platformumuza katılın.</Text>
-          </View>
-        </View>
-
-        <View style={styles.stepContainer}>
-          <View style={styles.stepNumber}>
-            <Text style={styles.stepNumberText}>2</Text>
-          </View>
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>İlanları İnceleyin</Text>
-            <Text style={styles.stepText}>Aktif ilanları görüntüleyin ve size uygun olanları bulun.</Text>
-          </View>
-        </View>
-
-        <View style={styles.stepContainer}>
-          <View style={styles.stepNumber}>
-            <Text style={styles.stepNumberText}>3</Text>
-          </View>
-          <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Teklif Verin</Text>
-            <Text style={styles.stepText}>Mevcut tekliften daha düşük bir fiyat sunun ve rekabete katılın.</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Alt Butonlar */}
-      <View style={styles.bottomButtons}>
-        <Button 
-          mode="contained" 
-          style={styles.fullWidthButton}
-          onPress={() => navigation.navigate('Login')}
-        >
-          Hemen Başlayın
-        </Button>
-      </View>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#ffffff',
   },
-  header: {
+  
+  // Hero Section
+  heroSection: {
+    minHeight: height * 0.75,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: '#667eea',
+  },
+  heroContent: {
+    flex: 1,
     alignItems: 'center',
-    padding: 40,
-    backgroundColor: '#4F46E5',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  logoContainer: {
+    position: 'relative',
+    marginBottom: 30,
   },
   logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 20,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
-  title: {
-    fontSize: 24,
+  logoGlow: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    top: -10,
+    left: -10,
+  },
+  heroTitle: {
+    fontSize: 32,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 8,
+    textAlign: 'center',
+    marginBottom: 10,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
-  subtitle: {
+  heroSubtitle: {
+    fontSize: 18,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  heroDescription: {
     fontSize: 16,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
+    marginBottom: 40,
+    paddingHorizontal: 20,
+    lineHeight: 22,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
+  heroButtons: {
+    width: '100%',
+    alignItems: 'center',
   },
-  button: {
-    flex: 1,
-    marginHorizontal: 8,
+  primaryButton: {
+    width: '85%',
+    marginBottom: 15,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
-  infoSection: {
-    padding: 20,
+  buttonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    alignItems: 'center',
+    backgroundColor: '#FF6B6B',
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  secondaryButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  secondaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Floating Elements
+  floatingElement1: {
+    position: 'absolute',
+    top: 100,
+    right: -50,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  floatingElement2: {
+    position: 'absolute',
+    bottom: 150,
+    left: -30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  floatingElement3: {
+    position: 'absolute',
+    top: 200,
+    left: 20,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  
+  // Features Section
+  featuresSection: {
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    backgroundColor: '#f8f9ff',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#2D3748',
     marginBottom: 10,
-    marginHorizontal: 20,
-    color: '#4F46E5',
   },
-  paragraph: {
+  sectionSubtitle: {
     fontSize: 16,
-    lineHeight: 24,
-    color: '#4B5563',
-    marginBottom: 10,
+    textAlign: 'center',
+    color: '#718096',
+    marginBottom: 40,
+    paddingHorizontal: 20,
+    lineHeight: 22,
   },
   featuresContainer: {
-    paddingHorizontal: 10,
-    marginBottom: 20,
+    marginHorizontal: -20,
+  },
+  featuresContent: {
+    paddingHorizontal: 20,
   },
   featureCard: {
     width: width * 0.7,
-    marginHorizontal: 10,
-    borderRadius: 12,
-    elevation: 3,
+    padding: 25,
+    marginHorizontal: 8,
+    borderRadius: 20,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  featureIconContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  featureIcon: {
+    margin: 0,
   },
   featureTitle: {
     fontSize: 18,
-    color: '#4F46E5',
-    marginBottom: 8,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 10,
   },
   featureText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  stepContainer: {
+  
+  // How It Works Section
+  howItWorksSection: {
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    backgroundColor: '#f8f9ff',
+  },
+  stepsContainer: {
+    marginTop: 20,
+  },
+  stepCard: {
     flexDirection: 'row',
+    padding: 20,
     marginBottom: 20,
+    borderRadius: 15,
+    backgroundColor: 'white',
     alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  stepNumber: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#4F46E5',
+  stepIconContainer: {
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  stepNumberGradient: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginBottom: 10,
+    backgroundColor: '#667eea',
+    elevation: 3,
   },
   stepNumberText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 18,
+    fontSize: 20,
+  },
+  stepIcon: {
+    margin: 0,
   },
   stepContent: {
     flex: 1,
   },
   stepTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 4,
-    color: '#1F2937',
+    color: '#2D3748',
+    marginBottom: 5,
   },
   stepText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#718096',
+    lineHeight: 20,
   },
-  bottomButtons: {
-    padding: 20,
+  
+  // Stats Section
+  statsSection: {
+    marginHorizontal: 20,
+    marginVertical: 30,
+    borderRadius: 20,
+    overflow: 'hidden',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  statsGradient: {
+    padding: 30,
+    backgroundColor: '#667eea',
+  },
+  statsTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 5,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  
+  // CTA Section
+  ctaSection: {
+    padding: 40,
+    alignItems: 'center',
+    backgroundColor: '#f8f9ff',
+  },
+  ctaTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#2D3748',
+    marginBottom: 10,
+  },
+  ctaSubtitle: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#718096',
+    marginBottom: 30,
+    paddingHorizontal: 20,
+  },
+  ctaButton: {
+    width: '85%',
     marginBottom: 20,
+    borderRadius: 30,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
-  fullWidthButton: {
-    paddingVertical: 8,
+  ctaButtonGradient: {
+    flexDirection: 'row',
+    paddingVertical: 16,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF6B6B',
+  },
+  ctaButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  loginLink: {
+    fontSize: 16,
+    color: '#718096',
+    textAlign: 'center',
+  },
+  loginLinkBold: {
+    fontWeight: 'bold',
+    color: '#667eea',
   },
 });
 

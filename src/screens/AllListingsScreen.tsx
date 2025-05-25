@@ -42,79 +42,13 @@ const GRID_SPACING = 12;
 const NUM_COLUMNS = 2;
 const CARD_WIDTH = (width - (GRID_SPACING * (NUM_COLUMNS + 1))) / NUM_COLUMNS;
 
-// Kategori resimlerini döndüren yardımcı fonksiyon
-const getCategoryImage = (categoryName: string): string => {
-  // Kategori adına göre uygun resimleri belirle (örnek resimler)
-  const categoryImages: Record<string, string> = {
-    // Elektronik ve Teknoloji
-    "Elektronik": "https://images.unsplash.com/photo-1498049794561-7780e7231661?q=80&w=500",
-    "Teknoloji": "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=500",
-    "Elektrik": "https://images.unsplash.com/photo-1544724569-5f546fd6f2b5?q=80&w=500",
-    "Bilgisayar": "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?q=80&w=500",
-    
-    // Ev ve Mobilya
-    "Mobilya": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=500",
-    "Ev Eşyaları": "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?q=80&w=500",
-    "Beyaz Eşya": "https://images.unsplash.com/photo-1584971217142-d63151e44256?q=80&w=500",
-    
-    // Giyim ve Tekstil
-    "Giyim": "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?q=80&w=500",
-    "Tekstil": "https://images.unsplash.com/photo-1620799140188-3b2a02fd9a77?q=80&w=500",
-    "Ayakkabı": "https://images.unsplash.com/photo-1595341888016-a392ef81b7de?q=80&w=500",
-    
-    // Yiyecek ve İçecek
-    "Gıda": "https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=500",
-    "İçecek": "https://images.unsplash.com/photo-1544145945-f90425340c7e?q=80&w=500",
-    "Tarım": "https://images.unsplash.com/photo-1499529112087-3cb3b73cec95?q=80&w=500",
-    
-    // İnşaat ve Yapı Malzemeleri
-    "İnşaat": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=500",
-    "İnşaat Malzemeleri": "https://images.unsplash.com/photo-1621155346337-1d19495a11ab?q=80&w=500",
-    "Yapı Malzemeleri": "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=500",
-    
-    // Ofis ve Kırtasiye
-    "Kırtasiye": "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=500",
-    "Ofis Malzemeleri": "https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?q=80&w=500",
-    "Kitap": "https://images.unsplash.com/photo-1516979187457-637abb4f9353?q=80&w=500",
-    
-    // Otomotiv
-    "Otomotiv": "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?q=80&w=500",
-    "Oto Yedek Parça": "https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?q=80&w=500",
-    "Araç": "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?q=80&w=500",
-    
-    // Spor ve Sağlık
-    "Spor": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=500",
-    "Fitness": "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=500",
-    "Medikal": "https://images.unsplash.com/photo-1631815588090-d4bfec5b7e5c?q=80&w=500",
-    "Sağlık": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?q=80&w=500",
-    "Eczane": "https://images.unsplash.com/photo-1563453392212-326f5e854473?q=80&w=500",
-    "Kozmetik": "https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=500",
-    "Bakım Ürünleri": "https://images.unsplash.com/photo-1590439471364-192aa70c0b53?q=80&w=500",
-    
-    // Diğer Kategoriler
-    "Hırdavat/Nalbur": "https://images.unsplash.com/photo-1562516710-6a880c0c4e5f?q=80&w=500",
-    "Bahçe": "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=500",
-    "Kimyasal": "https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?q=80&w=500",
-    "Temizlik": "https://images.unsplash.com/photo-1583947215259-38e31be8751f?q=80&w=500",
-    "Ambalaj": "https://images.unsplash.com/photo-1607344645866-009c320c5ab8?q=80&w=500",
-    "Endüstriyel": "https://images.unsplash.com/photo-1537427294423-eea2d66b0cc8?q=80&w=500"
-  };
-  
-  // Kategori adı varsa ve resmi tanımlıysa, o resmi döndür
-  if (categoryName && categoryImages[categoryName]) {
-    return categoryImages[categoryName];
-  }
-  
-  // Varsayılan resmi döndür - artık "SALE" yazılı bir resim değil, ticari bir ürün rafı
-  return "https://images.unsplash.com/photo-1607082349566-187342175e2f?q=80&w=500";
-};
-
 // Kullanacağımız tip tanımları
 interface Listing {  _id: string;  title: string;  description: string;  category: {    _id: string;    name: string;  };  currentPrice: number;  createdAt: string;  endTime?: string;  expiresAt?: string;  status?: string;  bids: Array<any>;  initialMaxPrice?: number;  owner?: { _id: string; name: string } | string;}
 
 type Category = {
   _id: string;
   name: string;
+  image?: string;
 };
 
 type SortOption = 'newest' | 'price-asc' | 'price-desc' | 'end-time';
@@ -145,6 +79,22 @@ const AllListingsScreen = ({ navigation, route }: AllListingsScreenProps) => {
     // Eğer route params'tan bir kategori gelirse, onu seçili kategori olarak belirle
     if (route.params?.categoryId) {
       setSelectedCategory(route.params.categoryId);
+    }
+
+    // Socket.io ile kategori güncellemelerini dinle
+    const handleCategoryUpdated = (data: any) => {
+      console.log('Kategori güncellendi (AllListings):', data);
+      // İlanları yeniden yükle ki kategori resimleri güncellensin
+      fetchData();
+    };
+
+    // Socket listener ekle (eğer socket varsa)
+    if (global.socket) {
+      global.socket.on('categoryUpdated', handleCategoryUpdated);
+      
+      return () => {
+        global.socket.off('categoryUpdated', handleCategoryUpdated);
+      };
     }
   }, [route.params]);
 
@@ -287,6 +237,33 @@ const AllListingsScreen = ({ navigation, route }: AllListingsScreenProps) => {
     }
   };
 
+  // Kategori resimlerini döndüren yardımcı fonksiyon - component içinde tanımlandı
+  const getCategoryImage = (category: any): string => {
+    // Eğer kategori bir obje ise ve image alanı varsa, backend'den gelen resmi kullan
+    if (typeof category === 'object' && category?.image) {
+      return `http://192.168.254.112:5001${category.image}`;
+    }
+    
+    // Kategori string ise, kategoriler listesinden resmi bul
+    if (typeof category === 'string') {
+      const foundCategory = categories.find(cat => cat._id === category);
+      if (foundCategory && foundCategory.image) {
+        return `http://192.168.254.112:5001${foundCategory.image}`;
+      }
+    }
+    
+    // Kategori adına göre resim bul (obje ise)
+    if (typeof category === 'object' && category?.name) {
+      const foundCategory = categories.find(cat => cat.name === category.name);
+      if (foundCategory && foundCategory.image) {
+        return `http://192.168.254.112:5001${foundCategory.image}`;
+      }
+    }
+    
+    // Varsayılan resmi döndür
+    return "https://images.unsplash.com/photo-1607082349566-187342175e2f?q=80&w=500";
+  };
+
   // Liste görünümünde her bir ilanı render et
   const renderListItem = ({ item }: { item: Listing }) => (
     <Surface style={[      styles.listItemContainer,      typeof item.owner === 'object'         ? (item.owner._id === user?._id ? { backgroundColor: '#FFF9C4' } : {})        : (item.owner === user?._id ? { backgroundColor: '#FFF9C4' } : {})    ]}>
@@ -296,7 +273,7 @@ const AllListingsScreen = ({ navigation, route }: AllListingsScreenProps) => {
       >
         <View style={styles.listImageContainer}>
           <ImageBackground
-            source={{ uri: getCategoryImage(item.category.name) }}
+            source={{ uri: getCategoryImage(item.category) }}
             style={styles.listItemImage}
             imageStyle={{ borderRadius: 8 }}
           >
@@ -364,7 +341,7 @@ const AllListingsScreen = ({ navigation, route }: AllListingsScreenProps) => {
     >
       <Card style={[        styles.gridCard,        typeof item.owner === 'object'           ? (item.owner._id === user?._id ? { backgroundColor: '#FFF9C4' } : {})          : (item.owner === user?._id ? { backgroundColor: '#FFF9C4' } : {})      ]}>
         <ImageBackground
-          source={{ uri: getCategoryImage(item.category.name) }}
+          source={{ uri: getCategoryImage(item.category) }}
           style={styles.gridCardImage}
         >
           <LinearGradient

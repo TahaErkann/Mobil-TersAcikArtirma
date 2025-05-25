@@ -6,6 +6,8 @@ export type RootStackParamList = {
   CreateListing: undefined;
   AllListings: undefined;
   Notifications: undefined;
+  MyListings: undefined;
+  MyBids: undefined;
   
   // Auth ekranları
   Welcome: undefined;

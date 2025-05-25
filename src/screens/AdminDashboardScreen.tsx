@@ -86,9 +86,6 @@ const AdminDashboardScreen = ({ navigation }: any) => {
     try {
       if (screenName === 'Kullanıcılar' || screenName === 'İlanlar' || screenName === 'Kategoriler') {
         navigation.navigate(screenName);
-      } else if (screenName === 'Settings') {
-        // Settings henüz uygulanmadı, kullanıcıya bilgi ver
-        Alert.alert('Bilgi', 'Ayarlar ekranı henüz uygulanmadı.');
       } else {
         console.warn(`Bilinmeyen ekran ismi: ${screenName}`);
       }
@@ -216,20 +213,6 @@ const AdminDashboardScreen = ({ navigation }: any) => {
           <View style={styles.menuTextContainer}>
             <Text style={styles.menuTitle}>Kategori Yönetimi</Text>
             <Text style={styles.menuSubtitle}>Kategorileri ekle, düzenle ve sil</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#6B7280" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.menuItem}
-          onPress={() => navigateToScreen('Settings')}
-        >
-          <View style={[styles.menuIconContainer, { backgroundColor: '#6B7280' }]}>
-            <Ionicons name="settings" size={24} color="white" />
-          </View>
-          <View style={styles.menuTextContainer}>
-            <Text style={styles.menuTitle}>Ayarlar</Text>
-            <Text style={styles.menuSubtitle}>Sistem ayarlarını yönet</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#6B7280" />
         </TouchableOpacity>
